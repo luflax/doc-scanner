@@ -14,7 +14,7 @@ export class ImageEnhancementService {
     }
 
     try {
-      this.cv = await loadOpenCV();
+      this.cv = (window.cv instanceof Promise) ? await window.cv : window.cv;
       this.isInitialized = true;
       console.log('ImageEnhancementService initialized');
     } catch (error) {
