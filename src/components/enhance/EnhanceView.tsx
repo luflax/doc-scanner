@@ -1,11 +1,13 @@
 import React, { useRef, useEffect, useState } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { useStore } from '@/store';
 import { Button } from '@/components/common/Button';
 import { Spinner } from '@/components/common/Spinner';
 import { FilterCarousel } from './FilterCarousel';
 import { AdjustmentSliders } from './AdjustmentSliders';
 import { imageEnhancementService } from '@/services/ImageEnhancementService';
-import type { FilterPreset, EnhancementOptions } from '@/types';
+import { getStorageService } from '@/services/StorageService';
+import type { FilterPreset, EnhancementOptions, Document, DocumentPage } from '@/types';
 import { DEFAULT_ENHANCEMENT_OPTIONS } from '@/constants/filters';
 
 export const EnhanceView: React.FC = () => {
@@ -15,20 +17,28 @@ export const EnhanceView: React.FC = () => {
   const [showAdjustments, setShowAdjustments] = useState(false);
 
   const {
+    currentImage,
     processedImage,
+    adjustedCorners,
     selectedFilter,
     enhancementOptions,
     setCurrentView,
     setSelectedFilter,
     setEnhancementOptions,
+    addDocument,
+    resetScanSession,
     addToast,
   } = useStore((state) => ({
+    currentImage: state.scanSession.currentImage,
     processedImage: state.scanSession.processedImage,
+    adjustedCorners: state.scanSession.adjustedCorners,
     selectedFilter: state.scanSession.selectedFilter,
     enhancementOptions: state.scanSession.enhancementOptions,
     setCurrentView: state.setCurrentView,
     setSelectedFilter: state.setSelectedFilter,
     setEnhancementOptions: state.setEnhancementOptions,
+    addDocument: state.addDocument,
+    resetScanSession: state.resetScanSession,
     addToast: state.addToast,
   }));
 
@@ -147,11 +157,131 @@ export const EnhanceView: React.FC = () => {
     setEnhancementOptions(options);
   };
 
-  const handleSave = () => {
-    addToast({
-      type: 'info',
-      message: 'Document saving feature coming soon!',
-    });
+  const handleSave = async () => {
+    if (!currentImageData || !currentImage) {
+      addToast({
+        type: 'error',
+        message: 'No image to save',
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      // Convert ImageData to Blob for storage
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Failed to get canvas context');
+
+      canvas.width = currentImageData.width;
+      canvas.height = currentImageData.height;
+      ctx.putImageData(currentImageData, 0, 0);
+
+      const processedBlob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error('Failed to convert canvas to blob'));
+        }, 'image/png');
+      });
+
+      // Convert original ImageData to Blob
+      const originalCanvas = document.createElement('canvas');
+      const originalCtx = originalCanvas.getContext('2d');
+      if (!originalCtx) throw new Error('Failed to get canvas context');
+
+      originalCanvas.width = currentImage.width;
+      originalCanvas.height = currentImage.height;
+      originalCtx.putImageData(currentImage, 0, 0);
+
+      const originalBlob = await new Promise<Blob>((resolve, reject) => {
+        originalCanvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error('Failed to convert canvas to blob'));
+        }, 'image/png');
+      });
+
+      // Create thumbnail (smaller version for grid view)
+      const thumbnailCanvas = document.createElement('canvas');
+      const thumbnailCtx = thumbnailCanvas.getContext('2d');
+      if (!thumbnailCtx) throw new Error('Failed to get canvas context');
+
+      const maxThumbSize = 300;
+      const scale = Math.min(
+        maxThumbSize / currentImageData.width,
+        maxThumbSize / currentImageData.height
+      );
+
+      thumbnailCanvas.width = currentImageData.width * scale;
+      thumbnailCanvas.height = currentImageData.height * scale;
+      thumbnailCtx.drawImage(canvas, 0, 0, thumbnailCanvas.width, thumbnailCanvas.height);
+
+      const thumbnailBlob = await new Promise<Blob>((resolve, reject) => {
+        thumbnailCanvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error('Failed to convert canvas to blob'));
+        }, 'image/jpeg', 0.8);
+      });
+
+      // Create document page
+      const page: DocumentPage = {
+        id: uuidv4(),
+        pageNumber: 1,
+        originalImage: originalBlob,
+        processedImage: processedBlob,
+        thumbnailImage: thumbnailBlob,
+        corners: adjustedCorners || [],
+        enhancementSettings: enhancementOptions,
+        filterApplied: selectedFilter,
+        dimensions: {
+          width: currentImageData.width,
+          height: currentImageData.height,
+        },
+      };
+
+      // Create document
+      const now = new Date();
+      const documentName = `Document ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`;
+      const newDocument: Document = {
+        id: uuidv4(),
+        name: documentName,
+        createdAt: now,
+        updatedAt: now,
+        pages: [page],
+        tags: [],
+        metadata: {
+          totalPages: 1,
+          hasOCR: false,
+          fileSize: processedBlob.size,
+          source: 'camera',
+        },
+      };
+
+      // Save to storage
+      const storageService = await getStorageService();
+      await storageService.createDocument(newDocument);
+
+      // Update store
+      addDocument(newDocument);
+
+      // Reset scan session
+      resetScanSession();
+
+      addToast({
+        type: 'success',
+        message: 'Document saved successfully',
+      });
+
+      // Navigate to documents view
+      setCurrentView('documents');
+    } catch (error) {
+      console.error('Failed to save document:', error);
+      addToast({
+        type: 'error',
+        message: 'Failed to save document',
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   if (!processedImage) {

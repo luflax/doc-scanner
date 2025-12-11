@@ -6,6 +6,8 @@ import { CameraView } from '@/components/camera/CameraView';
 import { CropView } from '@/components/crop/CropView';
 import { EnhanceView } from '@/components/enhance/EnhanceView';
 import { DocumentsView } from '@/components/documents/DocumentsView';
+import { OCRView } from '@/components/ocr/OCRView';
+import { ExportView } from '@/components/export/ExportView';
 
 function App() {
   const currentView = useStore((state) => state.ui.currentView);
@@ -21,17 +23,9 @@ function App() {
       case 'documents':
         return <DocumentsView />;
       case 'ocr':
-        return (
-          <div className="flex items-center justify-center h-full">
-            <p>OCR View - Coming Soon</p>
-          </div>
-        );
+        return <OCRView />;
       case 'export':
-        return (
-          <div className="flex items-center justify-center h-full">
-            <p>Export View - Coming Soon</p>
-          </div>
-        );
+        return <ExportView />;
       default:
         return <CameraView />;
     }
