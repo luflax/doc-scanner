@@ -42,6 +42,7 @@ interface DocumentsState {
   list: Document[];
   currentDocument: Document | null;
   isLoading: boolean;
+  selectedDocumentIds: string[];
 }
 
 interface UIState {
@@ -87,6 +88,9 @@ interface AppState {
   setDocumentsLoading: (loading: boolean) => void;
   addDocument: (document: Document) => void;
   removeDocument: (id: string) => void;
+  toggleDocumentSelection: (id: string) => void;
+  clearDocumentSelection: () => void;
+  selectAllDocuments: () => void;
 
   // UI actions
   setCurrentView: (view: ViewType) => void;
@@ -125,6 +129,7 @@ export const useStore = create<AppState>((set) => ({
     list: [],
     currentDocument: null,
     isLoading: false,
+    selectedDocumentIds: [],
   },
   ui: {
     currentView: 'camera',
@@ -248,6 +253,35 @@ export const useStore = create<AppState>((set) => ({
       documents: {
         ...state.documents,
         list: state.documents.list.filter((doc) => doc.id !== id),
+        selectedDocumentIds: state.documents.selectedDocumentIds.filter(
+          (docId) => docId !== id
+        ),
+      },
+    })),
+  toggleDocumentSelection: (id) =>
+    set((state) => {
+      const isSelected = state.documents.selectedDocumentIds.includes(id);
+      return {
+        documents: {
+          ...state.documents,
+          selectedDocumentIds: isSelected
+            ? state.documents.selectedDocumentIds.filter((docId) => docId !== id)
+            : [...state.documents.selectedDocumentIds, id],
+        },
+      };
+    }),
+  clearDocumentSelection: () =>
+    set((state) => ({
+      documents: {
+        ...state.documents,
+        selectedDocumentIds: [],
+      },
+    })),
+  selectAllDocuments: () =>
+    set((state) => ({
+      documents: {
+        ...state.documents,
+        selectedDocumentIds: state.documents.list.map((doc) => doc.id),
       },
     })),
 
