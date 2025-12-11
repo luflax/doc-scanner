@@ -21,7 +21,12 @@ export function loadOpenCV(): Promise<any> {
   if (window.__opencvLoadPromise) return window.__opencvLoadPromise;
   if (isLoaded && window.cv) return Promise.resolve(window.cv);
 
+  let resolvePromise;
+  let rejectPromise;
+
   window.__opencvLoadPromise = new Promise((resolve, reject) => {
+    resolvePromise = resolve;
+    rejectPromise = reject;
     // Ensure Module exists and we set the init callback BEFORE loading script
     window.Module = window.Module || {};
     const previousInit = window.Module.onRuntimeInitialized;
@@ -30,10 +35,10 @@ export function loadOpenCV(): Promise<any> {
       try {
         isLoaded = true;
         console.log('[loadOpenCV] Module.onRuntimeInitialized fired');
-        resolve(window.cv);
+        resolvePromise(window.cv);
       } catch (err) {
         console.error('[loadOpenCV] error resolving promise', err);
-        reject(err);
+        rejectPromise(err);
       }
     };
 
@@ -51,13 +56,13 @@ export function loadOpenCV(): Promise<any> {
           if (!isLoaded) {
             isLoaded = true;
             console.log('[loadOpenCV] cv.Mat present on load — resolving immediately');
-            resolve(window.cv);
+            resolvePromise(window.cv);
           } else {
             console.log('[loadOpenCV] already marked loaded');
           }
         } catch (err) {
           console.error('[loadOpenCV] error resolving onload', err);
-          reject(err);
+          rejectPromise(err);
         }
       }
       // otherwise, wait for Module.onRuntimeInitialized to run
@@ -69,7 +74,7 @@ export function loadOpenCV(): Promise<any> {
       window.__opencvLoadPromise = null;
       // restore previous init if any
       if (previousInit) window.Module.onRuntimeInitialized = previousInit;
-      reject(new Error('Failed to load OpenCV.js script'));
+      rejectPromise(new Error('Failed to load OpenCV.js script'));
     };
 
     document.body.appendChild(script);
