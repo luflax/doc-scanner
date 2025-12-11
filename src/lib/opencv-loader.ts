@@ -21,8 +21,8 @@ export function loadOpenCV(): Promise<any> {
   if (window.__opencvLoadPromise) return window.__opencvLoadPromise;
   if (isLoaded && window.cv) return Promise.resolve(window.cv);
 
-  let resolvePromise;
-  let rejectPromise;
+  let resolvePromise: any;
+  let rejectPromise: any;
 
   window.__opencvLoadPromise = new Promise((resolve, reject) => {
     resolvePromise = resolve;
