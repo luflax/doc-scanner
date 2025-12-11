@@ -1,4 +1,4 @@
-import { loadOpenCV, imageDataToMat, matToImageData, deleteMat, isOpenCVLoaded } from '@/lib/opencv-loader';
+import { imageDataToMat, matToImageData, deleteMat, isOpenCVLoaded } from '@/lib/opencv-loader';
 import type { EnhancementOptions, FilterPreset } from '@/types';
 
 export class ImageEnhancementService {
