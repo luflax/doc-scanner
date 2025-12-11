@@ -37,11 +37,20 @@ export async function loadOpenCV(): Promise<any> {
       // OpenCV.js initializes asynchronously after script load
       // We need to wait for cv.onRuntimeInitialized
       if (window.cv) {
-        window.cv.onRuntimeInitialized = () => {
+        // Check if OpenCV is already initialized (race condition fix)
+        // If cv.Mat exists, the runtime is already initialized
+        if (window.cv.Mat) {
           isLoaded = true;
-          console.log('OpenCV.js loaded successfully');
+          console.log('OpenCV.js loaded successfully (already initialized)');
           resolve(window.cv);
-        };
+        } else {
+          // Not yet initialized, wait for the callback
+          window.cv.onRuntimeInitialized = () => {
+            isLoaded = true;
+            console.log('OpenCV.js loaded successfully');
+            resolve(window.cv);
+          };
+        }
       } else {
         reject(new Error('OpenCV.js failed to load: cv not found'));
       }
