@@ -11,7 +11,6 @@ declare global {
   }
 }
 
-let opencvLoadPromise: Promise<any> | null = null;
 let isLoaded = false;
 
 /**
