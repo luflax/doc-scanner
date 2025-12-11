@@ -72,11 +72,15 @@ export const CropView: React.FC = () => {
   }, []);
 
   const detectEdges = async () => {
+    console.log('[CropView] detectEdges() called');
     if (!currentImage) return;
 
+    console.log('[CropView] Setting isDetecting to true');
     setIsDetecting(true);
     try {
+      console.log('[CropView] Calling edgeDetectionService.detectDocument()');
       const detected = await edgeDetectionService.detectDocument(currentImage);
+      console.log('[CropView] detectDocument() returned:', detected);
 
       if (detected) {
         setDetectedEdges(detected);
@@ -100,12 +104,13 @@ export const CropView: React.FC = () => {
         });
       }
     } catch (error) {
-      console.error('Edge detection failed:', error);
+      console.error('[CropView] Edge detection failed:', error);
       addToast({
         type: 'error',
         message: 'Edge detection failed',
       });
     } finally {
+      console.log('[CropView] Setting isDetecting to false');
       setIsDetecting(false);
     }
   };
