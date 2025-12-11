@@ -6,6 +6,8 @@
 declare global {
   interface Window {
     cv: any;
+    Module?: any;
+    __opencvLoadPromise?: Promise<any> | null;
   }
 }
 
@@ -15,58 +17,71 @@ let isLoaded = false;
 /**
  * Load OpenCV.js from CDN
  */
-export async function loadOpenCV(): Promise<any> {
-  // Return existing promise if already loading
-  if (opencvLoadPromise) {
-    return opencvLoadPromise;
-  }
+export function loadOpenCV(): Promise<any> {
+  // Use a single global promise so hot-reload / multiple bundles share it
+  if (window.__opencvLoadPromise) return window.__opencvLoadPromise;
+  if (isLoaded && window.cv) return Promise.resolve(window.cv);
 
-  // Return immediately if already loaded
-  if (isLoaded && window.cv) {
-    return Promise.resolve(window.cv);
-  }
+  window.__opencvLoadPromise = new Promise((resolve, reject) => {
+    // Ensure Module exists and we set the init callback BEFORE loading script
+    window.Module = window.Module || {};
+    const previousInit = window.Module.onRuntimeInitialized;
 
-  opencvLoadPromise = new Promise((resolve, reject) => {
+    window.Module.onRuntimeInitialized = () => {
+      try {
+        isLoaded = true;
+        console.log('[loadOpenCV] Module.onRuntimeInitialized fired');
+        resolve(window.cv);
+      } catch (err) {
+        console.error('[loadOpenCV] error resolving promise', err);
+        reject(err);
+      }
+    };
+
     // Create script element
     const script = document.createElement('script');
     script.async = true;
     script.src = 'https://docs.opencv.org/4.8.0/opencv.js';
 
-    // Handle load success
     script.onload = () => {
-      // OpenCV.js initializes asynchronously after script load
-      // We need to wait for cv.onRuntimeInitialized
-      if (window.cv) {
-        // Check if OpenCV is already initialized (race condition fix)
-        // If cv.Mat exists, the runtime is already initialized
-        if (window.cv.Mat) {
-          isLoaded = true;
-          console.log('OpenCV.js loaded successfully (already initialized)');
-          resolve(window.cv);
-        } else {
-          // Not yet initialized, wait for the callback
-          window.cv.onRuntimeInitialized = () => {
+      console.log('[loadOpenCV] script.onload executed; window.cv=', !!window.cv);
+      // If cv already initialized synchronously and Module callback won't be called,
+      // check for cv.Mat and resolve manually.
+      if (window.cv && window.cv.Mat) {
+        try {
+          if (!isLoaded) {
             isLoaded = true;
-            console.log('OpenCV.js loaded successfully');
+            console.log('[loadOpenCV] cv.Mat present on load — resolving immediately');
             resolve(window.cv);
-          };
+          } else {
+            console.log('[loadOpenCV] already marked loaded');
+          }
+        } catch (err) {
+          console.error('[loadOpenCV] error resolving onload', err);
+          reject(err);
         }
-      } else {
-        reject(new Error('OpenCV.js failed to load: cv not found'));
       }
+      // otherwise, wait for Module.onRuntimeInitialized to run
     };
 
-    // Handle load error
-    script.onerror = () => {
-      opencvLoadPromise = null;
+    script.onerror = (ev) => {
+      console.error('[loadOpenCV] script.onerror', ev);
+      // clear the global promise so retries can happen
+      window.__opencvLoadPromise = null;
+      // restore previous init if any
+      if (previousInit) window.Module.onRuntimeInitialized = previousInit;
       reject(new Error('Failed to load OpenCV.js script'));
     };
 
-    // Add script to document
     document.body.appendChild(script);
   });
 
-  return opencvLoadPromise;
+  // Optional: attach catch so unhandled rejection doesn't get swallowed
+  window.__opencvLoadPromise.catch((e) => {
+    console.error('[loadOpenCV] promise rejected', e);
+  });
+
+  return window.__opencvLoadPromise;
 }
 
 /**
