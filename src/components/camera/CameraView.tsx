@@ -1,109 +1,77 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useStore } from '@/store';
+import { useCameraStream } from '@/hooks/useCameraStream';
 import { Button } from '@/components/common/Button';
+import { IconButton } from '@/components/common/IconButton';
 import { Spinner } from '@/components/common/Spinner';
 
 export const CameraView: React.FC = () => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const {
-    stream,
-    isInitialized,
-    setCameraInitialized,
-    setCameraStream,
-    setCameraError,
-    addToast,
-  } = useStore((state) => ({
-    stream: state.camera.stream,
-    isInitialized: state.camera.isInitialized,
-    setCameraInitialized: state.setCameraInitialized,
-    setCameraStream: state.setCameraStream,
-    setCameraError: state.setCameraError,
+  const { addToast, setCameraCapabilities, setCurrentView, startScanSession } = useStore((state) => ({
     addToast: state.addToast,
+    setCameraCapabilities: state.setCameraCapabilities,
+    setCurrentView: state.setCurrentView,
+    startScanSession: state.startScanSession,
   }));
 
-  const initializeCamera = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const constraints = {
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        },
-        audio: false,
-      };
-
-      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-      setCameraStream(mediaStream);
-      setCameraInitialized(true);
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
-
+  const {
+    videoRef,
+    isInitialized,
+    isLoading,
+    error,
+    capabilities,
+    facingMode,
+    initialize,
+    switchCamera,
+    capturePhoto,
+  } = useCameraStream({
+    onError: (err) => {
+      addToast({
+        type: 'error',
+        message: err.message || 'Failed to access camera',
+      });
+    },
+    onInitialized: () => {
       addToast({
         type: 'success',
         message: 'Camera initialized successfully',
       });
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to access camera';
-      setError(errorMessage);
-      setCameraError(err instanceof Error ? err : new Error(errorMessage));
-      addToast({
-        type: 'error',
-        message: 'Failed to access camera. Please grant camera permissions.',
-      });
-    } finally {
-      setIsLoading(false);
+    },
+  });
+
+  // Update capabilities in store
+  useEffect(() => {
+    if (capabilities) {
+      setCameraCapabilities(capabilities);
     }
-  };
+  }, [capabilities, setCameraCapabilities]);
 
-  const captureImage = async () => {
-    if (!videoRef.current || !stream) return;
-
-    try {
-      const video = videoRef.current;
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('Failed to get canvas context');
-
-      ctx.drawImage(video, 0, 0);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-      // Store the captured image
-      useStore.getState().startScanSession(imageData);
-      useStore.getState().setCurrentView('crop');
+  const handleCapture = async () => {
+    const imageData = await capturePhoto();
+    if (imageData) {
+      startScanSession(imageData);
+      setCurrentView('crop');
 
       addToast({
         type: 'success',
         message: 'Image captured successfully',
       });
-    } catch (err) {
-      addToast({
-        type: 'error',
-        message: 'Failed to capture image',
-      });
     }
   };
 
-  useEffect(() => {
-    return () => {
-      // Cleanup: stop camera stream when component unmounts
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
-        setCameraStream(null);
-        setCameraInitialized(false);
-      }
-    };
-  }, []);
+  const handleSwitchCamera = async () => {
+    try {
+      await switchCamera();
+      addToast({
+        type: 'success',
+        message: `Switched to ${facingMode === 'environment' ? 'front' : 'back'} camera`,
+      });
+    } catch (err) {
+      addToast({
+        type: 'error',
+        message: 'Failed to switch camera',
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -120,13 +88,13 @@ export const CameraView: React.FC = () => {
         <div className="text-6xl mb-4">📷</div>
         <h2 className="text-xl font-semibold mb-2">Camera Access Required</h2>
         {error && (
-          <p className="text-sm text-red-600 mb-4 text-center max-w-md">{error}</p>
+          <p className="text-sm text-red-600 mb-4 text-center max-w-md">{error.message}</p>
         )}
         <p className="text-sm text-gray-600 mb-6 text-center max-w-md">
           This app needs access to your camera to scan documents. Click the button below to
           grant permission.
         </p>
-        <Button onClick={initializeCamera} variant="primary" size="lg">
+        <Button onClick={initialize} variant="primary" size="lg">
           Enable Camera
         </Button>
       </div>
@@ -143,11 +111,23 @@ export const CameraView: React.FC = () => {
         className="w-full h-full object-cover"
       />
 
+      {/* Top controls */}
+      <div className="absolute top-0 left-0 right-0 p-4">
+        <div className="flex justify-end">
+          <IconButton
+            icon={<span className="text-xl">🔄</span>}
+            onClick={handleSwitchCamera}
+            className="bg-black/50 text-white hover:bg-black/70"
+            label="Switch camera"
+          />
+        </div>
+      </div>
+
       {/* Camera controls overlay */}
       <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent">
         <div className="flex items-center justify-center">
           <Button
-            onClick={captureImage}
+            onClick={handleCapture}
             variant="primary"
             size="lg"
             className="rounded-full w-16 h-16 p-0"
