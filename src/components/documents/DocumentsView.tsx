@@ -1,29 +1,42 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '@/store';
 import { getStorageService } from '@/services/StorageService';
+import { getBulkExportService } from '@/services/BulkExportService';
 import { Button } from '@/components/common/Button';
 import { Spinner } from '@/components/common/Spinner';
-import type { Document } from '@/types';
+import type { Document, PDFExportOptions, ImageExportOptions } from '@/types';
+import type { BulkExportFormat } from '@/services/BulkExportService';
 
 export const DocumentsView: React.FC = () => {
   const {
     documents,
+    selectedDocumentIds,
     setDocuments,
     setCurrentDocument,
     removeDocument,
+    toggleDocumentSelection,
+    clearDocumentSelection,
+    selectAllDocuments,
     setCurrentView,
     addToast,
   } = useStore((state) => ({
     documents: state.documents.list,
+    selectedDocumentIds: state.documents.selectedDocumentIds,
     setDocuments: state.setDocuments,
     setCurrentDocument: state.setCurrentDocument,
     removeDocument: state.removeDocument,
+    toggleDocumentSelection: state.toggleDocumentSelection,
+    clearDocumentSelection: state.clearDocumentSelection,
+    selectAllDocuments: state.selectAllDocuments,
     setCurrentView: state.setCurrentView,
     addToast: state.addToast,
   }));
 
   const [isLoading, setIsLoading] = useState(true);
   const [thumbnails, setThumbnails] = useState<Map<string, string>>(new Map());
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState({ current: 0, total: 0 });
 
   // Load documents from storage on mount
   useEffect(() => {
@@ -73,8 +86,104 @@ export const DocumentsView: React.FC = () => {
   };
 
   const handleDocumentClick = (document: Document) => {
-    setCurrentDocument(document);
-    setCurrentView('export'); // Go to export view for now
+    if (isSelectionMode) {
+      toggleDocumentSelection(document.id);
+    } else {
+      setCurrentDocument(document);
+      setCurrentView('export'); // Go to export view for now
+    }
+  };
+
+  const handleToggleSelectionMode = () => {
+    if (isSelectionMode) {
+      clearDocumentSelection();
+    }
+    setIsSelectionMode(!isSelectionMode);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedDocumentIds.length === documents.length) {
+      clearDocumentSelection();
+    } else {
+      selectAllDocuments();
+    }
+  };
+
+  const handleBulkExport = async (format: BulkExportFormat) => {
+    if (selectedDocumentIds.length === 0) {
+      addToast({
+        type: 'error',
+        message: 'No documents selected',
+      });
+      return;
+    }
+
+    try {
+      setIsExporting(true);
+      setExportProgress({ current: 0, total: selectedDocumentIds.length });
+
+      const bulkExportService = getBulkExportService();
+      const selectedDocs = documents.filter((doc) =>
+        selectedDocumentIds.includes(doc.id)
+      );
+
+      const pdfOptions: PDFExportOptions = {
+        pageSize: 'a4',
+        orientation: 'auto',
+        quality: 'high',
+        includeOCR: false,
+        compression: true,
+      };
+
+      const imageOptions: ImageExportOptions = {
+        format: 'png',
+        quality: 90,
+      };
+
+      const zipBlob = await bulkExportService.exportDocumentsAsZip(
+        selectedDocs,
+        {
+          format,
+          pdfOptions,
+          imageOptions,
+        },
+        (progress) => {
+          setExportProgress({ current: progress.current, total: progress.total });
+        }
+      );
+
+      // Download the zip file
+      const filename = bulkExportService.generateZipFilename(
+        selectedDocumentIds.length,
+        format
+      );
+      const url = URL.createObjectURL(zipBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      addToast({
+        type: 'success',
+        message: `Successfully exported ${selectedDocumentIds.length} document${selectedDocumentIds.length !== 1 ? 's' : ''}`,
+      });
+
+      // Exit selection mode after export
+      setIsSelectionMode(false);
+      clearDocumentSelection();
+    } catch (error) {
+      console.error('Bulk export failed:', error);
+      addToast({
+        type: 'error',
+        message: 'Failed to export documents',
+      });
+    } finally {
+      setIsExporting(false);
+      setExportProgress({ current: 0, total: 0 });
+    }
   };
 
   const handleDeleteDocument = async (e: React.MouseEvent, docId: string) => {
@@ -140,51 +249,93 @@ export const DocumentsView: React.FC = () => {
       <div className="bg-white border-b border-gray-200 p-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">My Documents</h2>
-          <Button
-            onClick={() => setCurrentView('camera')}
-            variant="primary"
-            size="sm"
-          >
-            + New Scan
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleToggleSelectionMode}
+              variant={isSelectionMode ? 'secondary' : 'outline'}
+              size="sm"
+            >
+              {isSelectionMode ? 'Cancel' : 'Select'}
+            </Button>
+            {!isSelectionMode && (
+              <Button
+                onClick={() => setCurrentView('camera')}
+                variant="primary"
+                size="sm"
+              >
+                + New Scan
+              </Button>
+            )}
+          </div>
         </div>
-        <p className="text-sm text-gray-600 mt-1">
-          {documents.length} document{documents.length !== 1 ? 's' : ''}
-        </p>
+        <div className="flex items-center justify-between mt-1">
+          <p className="text-sm text-gray-600">
+            {isSelectionMode && selectedDocumentIds.length > 0
+              ? `${selectedDocumentIds.length} selected`
+              : `${documents.length} document${documents.length !== 1 ? 's' : ''}`}
+          </p>
+          {isSelectionMode && (
+            <button
+              onClick={handleSelectAll}
+              className="text-sm text-blue-600 hover:text-blue-700"
+            >
+              {selectedDocumentIds.length === documents.length ? 'Deselect All' : 'Select All'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Documents Grid */}
       <div className="flex-1 overflow-y-auto p-4">
         <div className="grid grid-cols-2 gap-4">
-          {documents.map((doc) => (
-            <div
-              key={doc.id}
-              onClick={() => handleDocumentClick(doc)}
-              className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer overflow-hidden"
-            >
-              {/* Thumbnail */}
-              <div className="aspect-[3/4] bg-gray-200 relative overflow-hidden">
-                {thumbnails.has(doc.id) ? (
-                  <img
-                    src={thumbnails.get(doc.id)}
-                    alt={doc.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-400">
-                    <span className="text-4xl">📄</span>
-                  </div>
-                )}
+          {documents.map((doc) => {
+            const isSelected = selectedDocumentIds.includes(doc.id);
+            return (
+              <div
+                key={doc.id}
+                onClick={() => handleDocumentClick(doc)}
+                className={`bg-white rounded-lg shadow hover:shadow-lg transition-all cursor-pointer overflow-hidden ${
+                  isSelected ? 'ring-2 ring-blue-500' : ''
+                }`}
+              >
+                {/* Thumbnail */}
+                <div className="aspect-[3/4] bg-gray-200 relative overflow-hidden">
+                  {thumbnails.has(doc.id) ? (
+                    <img
+                      src={thumbnails.get(doc.id)}
+                      alt={doc.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                      <span className="text-4xl">📄</span>
+                    </div>
+                  )}
 
-                {/* Delete button overlay */}
-                <button
-                  onClick={(e) => handleDeleteDocument(e, doc.id)}
-                  className="absolute top-2 right-2 w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg transition-colors"
-                  title="Delete document"
-                >
-                  ×
-                </button>
-              </div>
+                  {/* Selection checkbox */}
+                  {isSelectionMode && (
+                    <div className="absolute top-2 left-2">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleDocumentSelection(doc.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-6 h-6 cursor-pointer"
+                      />
+                    </div>
+                  )}
+
+                  {/* Delete button overlay */}
+                  {!isSelectionMode && (
+                    <button
+                      onClick={(e) => handleDeleteDocument(e, doc.id)}
+                      className="absolute top-2 right-2 w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg transition-colors"
+                      title="Delete document"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
 
               {/* Document Info */}
               <div className="p-3">
@@ -198,31 +349,67 @@ export const DocumentsView: React.FC = () => {
                 </div>
 
                 {/* Quick Actions */}
-                <div className="flex gap-2 mt-2">
-                  {!doc.metadata.hasOCR && (
+                {!isSelectionMode && (
+                  <div className="flex gap-2 mt-2">
+                    {!doc.metadata.hasOCR && (
+                      <button
+                        onClick={(e) => handleOCRDocument(e, doc)}
+                        className="flex-1 px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"
+                      >
+                        Extract Text
+                      </button>
+                    )}
                     <button
-                      onClick={(e) => handleOCRDocument(e, doc)}
-                      className="flex-1 px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCurrentDocument(doc);
+                        setCurrentView('export');
+                      }}
+                      className="flex-1 px-2 py-1 text-xs bg-green-50 text-green-600 rounded hover:bg-green-100 transition-colors"
                     >
-                      Extract Text
+                      Export
                     </button>
-                  )}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setCurrentDocument(doc);
-                      setCurrentView('export');
-                    }}
-                    className="flex-1 px-2 py-1 text-xs bg-green-50 text-green-600 rounded hover:bg-green-100 transition-colors"
-                  >
-                    Export
-                  </button>
-                </div>
+                  </div>
+                )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
+
+      {/* Bulk Export Action Bar */}
+      {isSelectionMode && selectedDocumentIds.length > 0 && (
+        <div className="bg-white border-t border-gray-200 p-4 shadow-lg">
+          {isExporting ? (
+            <div className="text-center">
+              <Spinner size="sm" />
+              <p className="text-sm text-gray-600 mt-2">
+                Exporting {exportProgress.current} of {exportProgress.total}...
+              </p>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <Button
+                onClick={() => handleBulkExport('pdf')}
+                variant="primary"
+                size="md"
+                className="flex-1"
+              >
+                📄 Export as PDFs
+              </Button>
+              <Button
+                onClick={() => handleBulkExport('images')}
+                variant="secondary"
+                size="md"
+                className="flex-1"
+              >
+                🖼️ Export as Images
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
