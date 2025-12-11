@@ -1,4 +1,4 @@
-import { imageDataToMat, matToImageData, deleteMat, isOpenCVLoaded } from '@/lib/opencv-loader';
+import { loadOpenCV, imageDataToMat, matToImageData, deleteMat, isOpenCVLoaded } from '@/lib/opencv-loader';
 import type { EnhancementOptions, FilterPreset } from '@/types';
 
 export class ImageEnhancementService {
@@ -14,7 +14,7 @@ export class ImageEnhancementService {
     }
 
     try {
-      this.cv = (window.cv instanceof Promise) ? await window.cv : window.cv;
+      this.cv = await loadOpenCV();
       this.isInitialized = true;
       console.log('ImageEnhancementService initialized');
     } catch (error) {
