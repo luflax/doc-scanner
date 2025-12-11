@@ -33,11 +33,6 @@ export const useCameraStream = (options: UseCameraStreamOptions = {}) => {
       const caps = cameraService.getCapabilities();
       setCapabilities(caps);
 
-      // Attach to video element if ref is set
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
-
       onInitialized?.(mediaStream);
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Failed to initialize camera');
@@ -59,11 +54,6 @@ export const useCameraStream = (options: UseCameraStreamOptions = {}) => {
       // Update capabilities
       const caps = cameraService.getCapabilities();
       setCapabilities(caps);
-
-      // Update video element
-      if (videoRef.current) {
-        videoRef.current.srcObject = newStream;
-      }
 
       onInitialized?.(newStream);
     } catch (err) {
@@ -113,6 +103,13 @@ export const useCameraStream = (options: UseCameraStreamOptions = {}) => {
     setIsInitialized(false);
     setCapabilities(null);
   };
+
+  // Attach stream to video element when both are available
+  useEffect(() => {
+    if (stream && videoRef.current) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream]);
 
   // Auto-start if requested
   useEffect(() => {
