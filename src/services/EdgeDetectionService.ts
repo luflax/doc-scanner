@@ -1,4 +1,4 @@
-import { loadOpenCV, imageDataToMat, deleteMat, isOpenCVLoaded } from '@/lib/opencv-loader';
+import { imageDataToMat, deleteMat, isOpenCVLoaded } from '@/lib/opencv-loader';
 import type { DetectedEdge, EdgeDetectionConfig, Point, Rectangle } from '@/types';
 
 export class EdgeDetectionService {
@@ -16,7 +16,7 @@ export class EdgeDetectionService {
 
     try {
       console.log('[EdgeDetectionService] Calling loadOpenCV()');
-      this.cv = (cv instanceof Promise) ? await cv : cv;
+      this.cv = (cv instanceof Promise) ? await window.cv : window.cv;
       console.log('[EdgeDetectionService] loadOpenCV() completed, cv:', this.cv);
       this.isInitialized = true;
       console.log('[EdgeDetectionService] EdgeDetectionService initialized');
