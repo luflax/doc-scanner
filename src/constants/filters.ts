@@ -101,3 +101,67 @@ export const FILTER_LABELS: Record<FilterPreset, string> = {
   photo: 'Photo',
   blueprint: 'Blueprint',
 };
+
+export interface FilterPresetInfo {
+  id: FilterPreset;
+  name: string;
+  description: string;
+  icon: string;
+}
+
+export const FILTER_PRESET_INFO: FilterPresetInfo[] = [
+  {
+    id: 'original',
+    name: 'Original',
+    description: 'No filter applied',
+    icon: '📄',
+  },
+  {
+    id: 'document',
+    name: 'Document',
+    description: 'High contrast B&W',
+    icon: '📃',
+  },
+  {
+    id: 'grayscale',
+    name: 'Grayscale',
+    description: 'Black and white',
+    icon: '⬜',
+  },
+  {
+    id: 'magic',
+    name: 'Magic',
+    description: 'Auto-enhanced',
+    icon: '✨',
+  },
+  {
+    id: 'whiteboard',
+    name: 'Whiteboard',
+    description: 'For whiteboards',
+    icon: '🖊️',
+  },
+  {
+    id: 'book',
+    name: 'Book',
+    description: 'For book pages',
+    icon: '📖',
+  },
+  {
+    id: 'receipt',
+    name: 'Receipt',
+    description: 'High contrast',
+    icon: '🧾',
+  },
+  {
+    id: 'photo',
+    name: 'Photo',
+    description: 'Color preserved',
+    icon: '🖼️',
+  },
+  {
+    id: 'blueprint',
+    name: 'Blueprint',
+    description: 'Inverted colors',
+    icon: '📐',
+  },
+];
