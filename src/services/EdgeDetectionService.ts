@@ -9,16 +9,19 @@ export class EdgeDetectionService {
    * Initialize the edge detection service by loading OpenCV
    */
   async initialize(): Promise<void> {
+    console.log('[EdgeDetectionService] initialize() called, isInitialized:', this.isInitialized);
     if (this.isInitialized) {
       return;
     }
 
     try {
+      console.log('[EdgeDetectionService] Calling loadOpenCV()');
       this.cv = await loadOpenCV();
+      console.log('[EdgeDetectionService] loadOpenCV() completed, cv:', this.cv);
       this.isInitialized = true;
-      console.log('EdgeDetectionService initialized');
+      console.log('[EdgeDetectionService] EdgeDetectionService initialized');
     } catch (error) {
-      console.error('Failed to initialize EdgeDetectionService:', error);
+      console.error('[EdgeDetectionService] Failed to initialize EdgeDetectionService:', error);
       throw error;
     }
   }
@@ -30,7 +33,9 @@ export class EdgeDetectionService {
     imageData: ImageData,
     config?: Partial<EdgeDetectionConfig>
   ): Promise<DetectedEdge | null> {
+    console.log('[EdgeDetectionService] detectDocument() called, image size:', imageData.width, 'x', imageData.height);
     if (!this.isInitialized) {
+      console.log('[EdgeDetectionService] Not initialized, calling initialize()');
       await this.initialize();
     }
 
@@ -54,29 +59,42 @@ export class EdgeDetectionService {
     let hierarchy: any = null;
 
     try {
+      console.log('[EdgeDetectionService] Starting edge detection pipeline');
+
       // Convert ImageData to Mat
+      console.log('[EdgeDetectionService] Converting ImageData to Mat');
       src = imageDataToMat(imageData);
+      console.log('[EdgeDetectionService] ImageData converted, Mat size:', src.rows, 'x', src.cols);
 
       // Convert to grayscale
+      console.log('[EdgeDetectionService] Converting to grayscale');
       gray = new this.cv.Mat();
       this.cv.cvtColor(src, gray, this.cv.COLOR_RGBA2GRAY);
+      console.log('[EdgeDetectionService] Grayscale conversion complete');
 
       // Apply Gaussian blur to reduce noise
+      console.log('[EdgeDetectionService] Applying Gaussian blur');
       blurred = new this.cv.Mat();
       const ksize = new this.cv.Size(finalConfig.blurKernelSize, finalConfig.blurKernelSize);
       this.cv.GaussianBlur(gray, blurred, ksize, 0);
+      console.log('[EdgeDetectionService] Gaussian blur complete');
 
       // Apply Canny edge detection
+      console.log('[EdgeDetectionService] Applying Canny edge detection');
       edges = new this.cv.Mat();
       this.cv.Canny(blurred, edges, finalConfig.cannyThreshold1, finalConfig.cannyThreshold2);
+      console.log('[EdgeDetectionService] Canny edge detection complete');
 
       // Dilate edges to close gaps
+      console.log('[EdgeDetectionService] Dilating edges');
       dilated = new this.cv.Mat();
       const kernel = this.cv.Mat.ones(3, 3, this.cv.CV_8U);
       this.cv.dilate(edges, dilated, kernel, new this.cv.Point(-1, -1), finalConfig.dilationIterations);
       kernel.delete();
+      console.log('[EdgeDetectionService] Edge dilation complete');
 
       // Find contours
+      console.log('[EdgeDetectionService] Finding contours');
       contours = new this.cv.MatVector();
       hierarchy = new this.cv.Mat();
       this.cv.findContours(
@@ -86,23 +104,28 @@ export class EdgeDetectionService {
         this.cv.RETR_EXTERNAL,
         this.cv.CHAIN_APPROX_SIMPLE
       );
+      console.log('[EdgeDetectionService] Found', contours.size(), 'contours');
 
       // Find the best quadrilateral
+      console.log('[EdgeDetectionService] Finding best quadrilateral');
       const result = this.findBestQuadrilateral(
         contours,
         imageData.width,
         imageData.height,
         finalConfig
       );
+      console.log('[EdgeDetectionService] Best quadrilateral result:', result);
 
       return result;
     } catch (error) {
-      console.error('Edge detection failed:', error);
+      console.error('[EdgeDetectionService] Edge detection failed:', error);
       return null;
     } finally {
+      console.log('[EdgeDetectionService] Cleaning up resources');
       // Cleanup
       deleteMat(src, gray, blurred, edges, dilated, hierarchy);
       if (contours) contours.delete();
+      console.log('[EdgeDetectionService] Cleanup complete');
     }
   }
 
