@@ -267,7 +267,7 @@ export interface ListOptions {
 }
 
 // UI State types
-export type ViewType = 'camera' | 'crop' | 'enhance' | 'ocr' | 'documents' | 'export';
+export type ViewType = 'camera' | 'crop' | 'enhance' | 'ocr' | 'documents' | 'detail' | 'export';
 
 export interface Toast {
   id: string;

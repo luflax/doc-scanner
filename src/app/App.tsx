@@ -6,6 +6,7 @@ import { CameraView } from '@/components/camera/CameraView';
 import { CropView } from '@/components/crop/CropView';
 import { EnhanceView } from '@/components/enhance/EnhanceView';
 import { DocumentsView } from '@/components/documents/DocumentsView';
+import { DocumentDetailView } from '@/components/documents/DocumentDetailView';
 import { OCRView } from '@/components/ocr/OCRView';
 import { ExportView } from '@/components/export/ExportView';
 
@@ -22,6 +23,8 @@ function App() {
         return <EnhanceView />;
       case 'documents':
         return <DocumentsView />;
+      case 'detail':
+        return <DocumentDetailView />;
       case 'ocr':
         return <OCRView />;
       case 'export':
