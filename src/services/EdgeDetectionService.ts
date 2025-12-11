@@ -16,7 +16,7 @@ export class EdgeDetectionService {
 
     try {
       console.log('[EdgeDetectionService] Calling loadOpenCV()');
-      this.cv = await loadOpenCV();
+      this.cv = (cv instanceof Promise) ? await cv : cv;
       console.log('[EdgeDetectionService] loadOpenCV() completed, cv:', this.cv);
       this.isInitialized = true;
       console.log('[EdgeDetectionService] EdgeDetectionService initialized');
