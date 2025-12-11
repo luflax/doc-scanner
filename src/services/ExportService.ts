@@ -155,12 +155,33 @@ export class ExportService {
   /**
    * Export OCR text as plain text
    */
-  async exportToText(document: Document): Promise<Blob> {
+  async exportToText(document: Document, formatted: boolean = false): Promise<Blob> {
     const texts: string[] = [];
 
-    for (const page of document.pages) {
-      if (page.ocrResult) {
-        texts.push(`--- Page ${page.pageNumber} ---\n\n${page.ocrResult.text}\n\n`);
+    if (formatted) {
+      // Export as Markdown
+      texts.push(`# ${document.name}\n\n`);
+      texts.push(`*Created: ${new Date(document.createdAt).toLocaleDateString()}*\n\n`);
+      texts.push(`---\n\n`);
+
+      for (const page of document.pages) {
+        if (page.ocrResult) {
+          texts.push(`## Page ${page.pageNumber}\n\n`);
+          texts.push(`${page.ocrResult.text}\n\n`);
+
+          if (page.ocrResult.confidence) {
+            texts.push(`*Confidence: ${page.ocrResult.confidence.toFixed(1)}%*\n\n`);
+          }
+
+          texts.push(`---\n\n`);
+        }
+      }
+    } else {
+      // Export as plain text
+      for (const page of document.pages) {
+        if (page.ocrResult) {
+          texts.push(`--- Page ${page.pageNumber} ---\n\n${page.ocrResult.text}\n\n`);
+        }
       }
     }
 
@@ -168,8 +189,8 @@ export class ExportService {
       throw new Error('No OCR text available in this document');
     }
 
-    const content = texts.join('\n');
-    return new Blob([content], { type: 'text/plain' });
+    const content = texts.join('');
+    return new Blob([content], { type: formatted ? 'text/markdown' : 'text/plain' });
   }
 
   /**

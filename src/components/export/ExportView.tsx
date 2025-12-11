@@ -15,6 +15,7 @@ export const ExportView: React.FC = () => {
   const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('pdf');
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
+  const [useFormattedText, setUseFormattedText] = useState(false);
 
   // PDF options
   const [pdfOptions, setPdfOptions] = useState<PDFExportOptions>({
@@ -100,13 +101,13 @@ export const ExportView: React.FC = () => {
 
         case 'txt': {
           setExportProgress(50);
-          const blob = await exportService.exportToText(currentDocument);
+          const blob = await exportService.exportToText(currentDocument, useFormattedText);
           setExportProgress(100);
-          filename += '.txt';
+          filename += useFormattedText ? '.md' : '.txt';
           exportService.downloadBlob(blob, filename);
           addToast({
             type: 'success',
-            message: 'Text exported successfully',
+            message: useFormattedText ? 'Markdown exported successfully' : 'Text exported successfully',
           });
           break;
         }
@@ -154,8 +155,8 @@ export const ExportView: React.FC = () => {
           }
           break;
         case 'txt':
-          blob = await exportService.exportToText(currentDocument);
-          filename = `${currentDocument.name}.txt`;
+          blob = await exportService.exportToText(currentDocument, useFormattedText);
+          filename = `${currentDocument.name}.${useFormattedText ? 'md' : 'txt'}`;
           break;
         default:
           throw new Error('Invalid format');
@@ -269,6 +270,104 @@ export const ExportView: React.FC = () => {
                 {currentDocument.metadata.hasOCR ? 'OCR text only' : 'OCR required'}
               </div>
             </button>
+          </div>
+        </div>
+
+        {/* Export Presets */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Quick Presets
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              onClick={() => {
+                setSelectedFormat('pdf');
+                setPdfOptions({
+                  ...pdfOptions,
+                  pageSize: 'a4',
+                  quality: 'high',
+                  includeOCR: currentDocument?.metadata.hasOCR || false,
+                });
+              }}
+              className="p-3 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              📧 Email
+              <div className="text-xs text-gray-500 mt-1">PDF • High quality</div>
+            </button>
+
+            <button
+              onClick={() => {
+                setSelectedFormat('pdf');
+                setPdfOptions({
+                  ...pdfOptions,
+                  pageSize: 'a4',
+                  quality: 'medium',
+                  includeOCR: false,
+                });
+              }}
+              className="p-3 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              🖨️ Print
+              <div className="text-xs text-gray-500 mt-1">PDF • A4 • Medium</div>
+            </button>
+
+            <button
+              onClick={() => {
+                setSelectedFormat('pdf');
+                setPdfOptions({
+                  ...pdfOptions,
+                  pageSize: 'original',
+                  quality: 'original',
+                  includeOCR: currentDocument?.metadata.hasOCR || false,
+                });
+              }}
+              className="p-3 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              💾 Archive
+              <div className="text-xs text-gray-500 mt-1">PDF • Original</div>
+            </button>
+
+            <button
+              onClick={() => {
+                setSelectedFormat('jpeg');
+                setImageOptions({
+                  format: 'jpeg',
+                  quality: 80,
+                  maxDimension: 1920,
+                });
+              }}
+              className="p-3 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              📱 Mobile
+              <div className="text-xs text-gray-500 mt-1">JPEG • Optimized</div>
+            </button>
+
+            <button
+              onClick={() => {
+                setSelectedFormat('png');
+                setImageOptions({
+                  format: 'png',
+                  quality: 100,
+                });
+              }}
+              className="p-3 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              🎨 Design
+              <div className="text-xs text-gray-500 mt-1">PNG • Lossless</div>
+            </button>
+
+            {currentDocument?.metadata.hasOCR && (
+              <button
+                onClick={() => {
+                  setSelectedFormat('txt');
+                  setUseFormattedText(true);
+                }}
+                className="p-3 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                📝 Notes
+                <div className="text-xs text-gray-500 mt-1">Markdown • Text</div>
+              </button>
+            )}
           </div>
         </div>
 
@@ -399,6 +498,67 @@ export const ExportView: React.FC = () => {
                   />
                 )}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Text Options */}
+        {selectedFormat === 'txt' && (
+          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+            <h3 className="font-medium mb-3">Text Options</h3>
+
+            <div className="space-y-4">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={useFormattedText}
+                  onChange={(e) => setUseFormattedText(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                <span className="text-sm text-gray-700">
+                  Export as Markdown (formatted with headings and metadata)
+                </span>
+              </label>
+
+              <div className="text-xs text-gray-600 bg-white p-3 rounded border border-gray-200">
+                {useFormattedText ? (
+                  <>
+                    <strong>Markdown format:</strong> Includes document title, creation date,
+                    page headings, and confidence scores. Perfect for documentation or note-taking apps.
+                  </>
+                ) : (
+                  <>
+                    <strong>Plain text format:</strong> Simple text output with page separators.
+                    Compatible with any text editor.
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Document Preview */}
+        {!isExporting && (
+          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+            <h3 className="font-medium mb-3">Document Preview</h3>
+            <div className="grid grid-cols-3 gap-2">
+              {currentDocument.pages.slice(0, 6).map((page) => (
+                <div key={page.id} className="aspect-[3/4] bg-gray-200 rounded overflow-hidden relative">
+                  <img
+                    src={URL.createObjectURL(page.thumbnailImage)}
+                    alt={`Page ${page.pageNumber}`}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-black/70 text-white text-xs rounded">
+                    {page.pageNumber}
+                  </div>
+                </div>
+              ))}
+              {currentDocument.pages.length > 6 && (
+                <div className="aspect-[3/4] bg-gray-300 rounded flex items-center justify-center text-gray-600 text-sm">
+                  +{currentDocument.pages.length - 6} more
+                </div>
+              )}
             </div>
           </div>
         )}
