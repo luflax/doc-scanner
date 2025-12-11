@@ -4,6 +4,7 @@ import { getStorageService } from '@/services/StorageService';
 import { getBulkExportService } from '@/services/BulkExportService';
 import { Button } from '@/components/common/Button';
 import { Spinner } from '@/components/common/Spinner';
+import { StorageInfo } from '@/components/common/StorageInfo';
 import type { Document, PDFExportOptions, ImageExportOptions } from '@/types';
 import type { BulkExportFormat } from '@/services/BulkExportService';
 
@@ -37,6 +38,8 @@ export const DocumentsView: React.FC = () => {
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState({ current: 0, total: 0 });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredDocuments, setFilteredDocuments] = useState<Document[]>([]);
 
   // Load documents from storage on mount
   useEffect(() => {
@@ -49,6 +52,35 @@ export const DocumentsView: React.FC = () => {
       loadThumbnails();
     }
   }, [documents]);
+
+  // Filter documents based on search query
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredDocuments(documents);
+    } else {
+      const query = searchQuery.toLowerCase();
+      const filtered = documents.filter((doc) => {
+        // Search in document name
+        if (doc.name.toLowerCase().includes(query)) {
+          return true;
+        }
+        // Search in tags
+        if (doc.tags.some((tag) => tag.toLowerCase().includes(query))) {
+          return true;
+        }
+        // Search in OCR text
+        if (doc.metadata.hasOCR) {
+          for (const page of doc.pages) {
+            if (page.ocrResult && page.ocrResult.text.toLowerCase().includes(query)) {
+              return true;
+            }
+          }
+        }
+        return false;
+      });
+      setFilteredDocuments(filtered);
+    }
+  }, [documents, searchQuery]);
 
   const loadDocuments = async () => {
     try {
@@ -90,7 +122,7 @@ export const DocumentsView: React.FC = () => {
       toggleDocumentSelection(document.id);
     } else {
       setCurrentDocument(document);
-      setCurrentView('export'); // Go to export view for now
+      setCurrentView('detail'); // Go to detail view
     }
   };
 
@@ -268,10 +300,26 @@ export const DocumentsView: React.FC = () => {
             )}
           </div>
         </div>
-        <div className="flex items-center justify-between mt-1">
+
+        {/* Search Bar */}
+        {!isSelectionMode && documents.length > 0 && (
+          <div className="mt-3">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search documents, tags, or text..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+            />
+          </div>
+        )}
+
+        <div className="flex items-center justify-between mt-2">
           <p className="text-sm text-gray-600">
             {isSelectionMode && selectedDocumentIds.length > 0
               ? `${selectedDocumentIds.length} selected`
+              : searchQuery
+              ? `${filteredDocuments.length} of ${documents.length} document${documents.length !== 1 ? 's' : ''}`
               : `${documents.length} document${documents.length !== 1 ? 's' : ''}`}
           </p>
           {isSelectionMode && (
@@ -283,12 +331,19 @@ export const DocumentsView: React.FC = () => {
             </button>
           )}
         </div>
+
+        {/* Storage Info */}
+        {!isSelectionMode && (
+          <div className="mt-3">
+            <StorageInfo compact />
+          </div>
+        )}
       </div>
 
       {/* Documents Grid */}
       <div className="flex-1 overflow-y-auto p-4">
         <div className="grid grid-cols-2 gap-4">
-          {documents.map((doc) => {
+          {filteredDocuments.map((doc) => {
             const isSelected = selectedDocumentIds.includes(doc.id);
             return (
               <div
