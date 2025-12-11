@@ -91,14 +91,14 @@ export function loadOpenCV(): Promise<any> {
  * Check if OpenCV is loaded
  */
 export function isOpenCVLoaded(): boolean {
-  return isLoaded && !!window.cv;
+  return /**isLoaded &&**/ !!window.cv;
 }
 
 /**
  * Get OpenCV instance (assumes already loaded)
  */
 export function getOpenCV(): any {
-  if (!isLoaded || !window.cv) {
+  if (/**!isLoaded ||**/ !window.cv) {
     throw new Error('OpenCV not loaded. Call loadOpenCV() first.');
   }
   return window.cv;
