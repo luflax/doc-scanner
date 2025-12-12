@@ -3,7 +3,7 @@ name: Deploy
 on:
   push:
     branches:
-      - claude/mobile-document-scanner-01EQzKHigUxCsh1aY88boWY7
+      - master
 
 jobs:
   build:
@@ -33,7 +33,7 @@ jobs:
     name: Deploy
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/claude/mobile-document-scanner-01EQzKHigUxCsh1aY88boWY7'
+    if: github.ref == 'refs/heads/master'
 
     steps:
       - name: Download artifact
