@@ -40,7 +40,6 @@ function App() {
     <ErrorBoundary>
       <div className="flex flex-col h-screen overflow-hidden bg-white">
         <Header />
-        <OfflineIndicator />
         <main className="flex-1 overflow-hidden mt-14 mb-16">
           {renderView()}
         </main>
