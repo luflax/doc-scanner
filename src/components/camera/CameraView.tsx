@@ -57,6 +57,7 @@ export const CameraView: React.FC = () => {
     detectedEdges: realtimeEdges,
     isReady: isEdgeDetectionReady,
     error: edgeDetectionError,
+    debugInfo,
   } = useEdgeDetection({
     enabled: isInitialized,
     videoElement: videoRef.current,
@@ -259,6 +260,66 @@ export const CameraView: React.FC = () => {
           <div className="border-2 border-white border-dashed rounded-lg w-full max-w-md aspect-document opacity-50" />
         </div>
       </div>
+
+      {/* Debug overlay - Temporal smoothing info */}
+      {isEdgeDetectionReady && (
+        <div className="absolute bottom-24 left-4 right-4 bg-black/80 rounded-lg p-3 text-white text-xs font-mono">
+          <div className="font-bold mb-2 text-center text-sm">
+            🔍 Edge Detection Debug
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <span className="text-gray-400">State:</span>{' '}
+              <span
+                className={
+                  debugInfo.detectionState === 'new'
+                    ? 'text-green-400 font-bold'
+                    : debugInfo.detectionState === 'cached'
+                    ? 'text-yellow-400 font-bold'
+                    : 'text-red-400 font-bold'
+                }
+              >
+                {debugInfo.detectionState.toUpperCase()}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-400">Confidence:</span>{' '}
+              <span className="text-white font-bold">
+                {(debugInfo.lastConfidence * 100).toFixed(0)}%
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-400">Using Cache:</span>{' '}
+              <span className={debugInfo.isUsingCache ? 'text-yellow-400' : 'text-green-400'}>
+                {debugInfo.isUsingCache ? 'YES' : 'NO'}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-400">Missed Frames:</span>{' '}
+              <span
+                className={
+                  debugInfo.framesWithoutDetection > 3 ? 'text-red-400' : 'text-green-400'
+                }
+              >
+                {debugInfo.framesWithoutDetection}/5
+              </span>
+            </div>
+          </div>
+          <div className="mt-2 pt-2 border-t border-gray-700 text-center">
+            {debugInfo.detectionState === 'new' && (
+              <span className="text-green-400">✓ Fresh detection</span>
+            )}
+            {debugInfo.detectionState === 'cached' && (
+              <span className="text-yellow-400">
+                ⏱ Showing cached ({debugInfo.framesWithoutDetection}/5)
+              </span>
+            )}
+            {debugInfo.detectionState === 'none' && (
+              <span className="text-red-400">✗ No document detected</span>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

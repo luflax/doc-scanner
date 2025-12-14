@@ -23,6 +23,13 @@ interface UseEdgeDetectionResult {
   isProcessing: boolean;
   isReady: boolean;
   error: Error | null;
+  // Debug info
+  debugInfo: {
+    framesWithoutDetection: number;
+    isUsingCache: boolean;
+    lastConfidence: number;
+    detectionState: 'new' | 'cached' | 'none';
+  };
 }
 
 // Temporal smoothing configuration
@@ -43,6 +50,12 @@ export function useEdgeDetection({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [debugInfo, setDebugInfo] = useState({
+    framesWithoutDetection: 0,
+    isUsingCache: false,
+    lastConfidence: 0,
+    detectionState: 'none' as 'new' | 'cached' | 'none',
+  });
 
   const frameCountRef = useRef(0);
   const rafRef = useRef<number | null>(null);
@@ -153,6 +166,14 @@ export function useEdgeDetection({
           framesWithoutDetectionRef.current = 0;
           lastGoodDetectionRef.current = edges;
           finalEdges = edges;
+
+          setDebugInfo({
+            framesWithoutDetection: 0,
+            isUsingCache: false,
+            lastConfidence: edges.confidence,
+            detectionState: 'new',
+          });
+
           console.log(
             `[EdgeDetection] New detection (conf: ${edges.confidence.toFixed(2)})`
           );
@@ -166,6 +187,14 @@ export function useEdgeDetection({
           ) {
             // Keep showing last good detection
             finalEdges = lastGoodDetectionRef.current;
+
+            setDebugInfo({
+              framesWithoutDetection: framesWithoutDetectionRef.current,
+              isUsingCache: true,
+              lastConfidence: lastGoodDetectionRef.current.confidence,
+              detectionState: 'cached',
+            });
+
             console.log(
               `[EdgeDetection] Using cached (${framesWithoutDetectionRef.current}/${TEMPORAL_SMOOTHING.keepFrames} frames)`
             );
@@ -173,6 +202,14 @@ export function useEdgeDetection({
             // Too many frames without detection - clear it
             finalEdges = null;
             lastGoodDetectionRef.current = null;
+
+            setDebugInfo({
+              framesWithoutDetection: framesWithoutDetectionRef.current,
+              isUsingCache: false,
+              lastConfidence: 0,
+              detectionState: 'none',
+            });
+
             console.log('[EdgeDetection] Cleared - too many frames without detection');
           }
         }
@@ -220,5 +257,6 @@ export function useEdgeDetection({
     isProcessing,
     isReady,
     error,
+    debugInfo,
   };
 }
