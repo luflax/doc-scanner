@@ -69,18 +69,44 @@ export const CameraView: React.FC = () => {
 
   // Measure container size for overlay positioning
   useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
     const updateSize = () => {
-      if (containerRef.current) {
-        setContainerSize({
-          width: containerRef.current.clientWidth,
-          height: containerRef.current.clientHeight,
-        });
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+
+      console.log('[CameraView] Container size update:', { width, height });
+
+      if (width > 0 && height > 0) {
+        setContainerSize({ width, height });
       }
     };
 
-    updateSize();
+    // Use ResizeObserver for more reliable size detection
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        console.log('[CameraView] ResizeObserver:', { width, height });
+        if (width > 0 && height > 0) {
+          setContainerSize({ width, height });
+        }
+      }
+    });
+
+    resizeObserver.observe(container);
+
+    // Also update on window resize as fallback
     window.addEventListener('resize', updateSize);
-    return () => window.removeEventListener('resize', updateSize);
+
+    // Initial measurement with small delay to ensure DOM is ready
+    const timeout = setTimeout(updateSize, 100);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', updateSize);
+      clearTimeout(timeout);
+    };
   }, []);
 
   // Wait for video metadata to load
