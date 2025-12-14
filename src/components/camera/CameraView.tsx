@@ -213,7 +213,7 @@ export const CameraView: React.FC = () => {
   }
 
   return (
-    <div ref={containerRef} className="relative w-full h-full bg-black">
+    <div ref={containerRef} className="relative w-full h-screen bg-black">
       <video
         ref={videoRef}
         autoPlay
