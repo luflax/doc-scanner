@@ -1,4 +1,6 @@
 import { useStore } from '@/store';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
+import { OfflineIndicator } from '@/components/common/OfflineIndicator';
 import { Header } from '@/components/layout/Header';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { ToastContainer } from '@/components/common/Toast';
@@ -35,14 +37,16 @@ function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-white">
-      <Header />
-      <main className="flex-1 overflow-hidden mt-14 mb-16">
-        {renderView()}
-      </main>
-      <BottomNavigation />
-      <ToastContainer />
-    </div>
+    <ErrorBoundary>
+      <div className="flex flex-col h-screen overflow-hidden bg-white">
+        <Header />
+        <main className="flex-1 overflow-hidden mt-14 mb-16">
+          {renderView()}
+        </main>
+        <BottomNavigation />
+        <ToastContainer />
+      </div>
+    </ErrorBoundary>
   );
 }
 

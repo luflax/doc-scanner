@@ -75,22 +75,64 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Increase cache size for better offline experience
+        maximumFileSizeToCacheInBytes: 10 * 1024 * 1024, // 10MB
         runtimeCaching: [
+          // CDN resources (OpenCV, Tesseract)
           {
-            urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/.*/i,
+            urlPattern: /^https:\/\/(cdn\.jsdelivr\.net|docs\.opencv\.org|unpkg\.com)\/.*/i,
             handler: 'CacheFirst',
             options: {
               cacheName: 'cdn-cache',
               expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
+                maxEntries: 20,
+                maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
               },
               cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          }
-        ]
+                statuses: [0, 200],
+              },
+            },
+          },
+          // Tesseract language files
+          {
+            urlPattern: /^https:\/\/.*\/lang\/.*\.traineddata$/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'tesseract-lang-cache',
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          // App shell (HTML, CSS, JS)
+          {
+            urlPattern: /\.(?:html|css|js)$/,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'app-shell',
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60 * 24 * 7, // 1 week
+              },
+            },
+          },
+          // Images
+          {
+            urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'images',
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+              },
+            },
+          },
+        ],
       }
     })
   ],
@@ -113,15 +155,68 @@ export default defineConfig({
   },
   build: {
     target: 'es2020',
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom'],
-          'zustand-vendor': ['zustand'],
-          'tesseract-vendor': ['tesseract.js'],
-          'pdf-vendor': ['jspdf']
-        }
-      }
-    }
+        manualChunks: (id) => {
+          // Vendor chunks for major libraries
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom')) {
+              return 'react-vendor';
+            }
+            if (id.includes('zustand')) {
+              return 'zustand-vendor';
+            }
+            if (id.includes('tesseract.js')) {
+              return 'tesseract-vendor';
+            }
+            if (id.includes('jspdf')) {
+              return 'pdf-vendor';
+            }
+            if (id.includes('jszip')) {
+              return 'zip-vendor';
+            }
+            if (id.includes('idb')) {
+              return 'db-vendor';
+            }
+            // Other node_modules go to common vendor
+            return 'vendor';
+          }
+
+          // Split by feature modules
+          if (id.includes('/services/')) {
+            return 'services';
+          }
+          if (id.includes('/components/camera/')) {
+            return 'camera';
+          }
+          if (id.includes('/components/documents/')) {
+            return 'documents';
+          }
+          if (id.includes('/components/ocr/')) {
+            return 'ocr';
+          }
+          if (id.includes('/components/export/')) {
+            return 'export';
+          }
+          if (id.includes('/components/enhance/')) {
+            return 'enhance';
+          }
+          if (id.includes('/components/crop/')) {
+            return 'crop';
+          }
+        },
+      },
+    },
+    // Source maps for production debugging (smaller than inline)
+    sourcemap: 'hidden',
+    // Minification options
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+      },
+    },
   }
 });
