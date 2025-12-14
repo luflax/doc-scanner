@@ -175,15 +175,6 @@ export const CropView: React.FC = () => {
     );
   }
 
-  if (isDetecting) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full bg-gray-900">
-        <Spinner size="lg" className="mb-4" />
-        <p className="text-white text-sm">Detecting document edges...</p>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col h-full bg-gray-900">
       {/* Canvas container */}
@@ -193,8 +184,16 @@ export const CropView: React.FC = () => {
           className="max-w-full max-h-full object-contain"
         />
 
+        {/* Detection overlay */}
+        {isDetecting && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 bg-opacity-90">
+            <Spinner size="lg" className="mb-4" />
+            <p className="text-white text-sm">Detecting document edges...</p>
+          </div>
+        )}
+
         {/* Corner handles overlay */}
-        {adjustedCorners && currentImage && containerSize.width > 0 && (
+        {adjustedCorners && currentImage && containerSize.width > 0 && !isDetecting && (
           <CornerHandles
             corners={adjustedCorners}
             imageSize={{ width: currentImage.width, height: currentImage.height }}
