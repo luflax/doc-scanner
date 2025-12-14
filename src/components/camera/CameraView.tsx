@@ -263,7 +263,7 @@ export const CameraView: React.FC = () => {
 
       {/* Debug overlay - Temporal smoothing info */}
       {isEdgeDetectionReady && (
-        <div className="absolute bottom-24 left-4 right-4 bg-black/80 rounded-lg p-3 text-white text-xs font-mono">
+        <div className="absolute bottom-24 left-4 right-4 bg-black/80 rounded-lg p-3 text-white text-xs font-mono max-h-96 overflow-y-auto">
           <div className="font-bold mb-2 text-center text-sm">
             🔍 Edge Detection Debug
           </div>
@@ -305,6 +305,52 @@ export const CameraView: React.FC = () => {
               </span>
             </div>
           </div>
+
+          {/* Overlay Render Checks */}
+          <div className="mt-2 pt-2 border-t border-gray-700">
+            <div className="font-bold mb-1 text-center text-xs text-yellow-300">
+              Overlay Conditions
+            </div>
+            <div className="grid grid-cols-2 gap-1 text-[10px]">
+              <div>
+                <span className="text-gray-400">hasEdges:</span>{' '}
+                <span className={!!realtimeEdges ? 'text-green-400' : 'text-red-400'}>
+                  {!!realtimeEdges ? '✓' : '✗'}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-400">videoReady:</span>{' '}
+                <span className={videoReady ? 'text-green-400' : 'text-red-400'}>
+                  {videoReady ? '✓' : '✗'}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-400">videoW:</span>{' '}
+                <span className={videoRef.current && videoRef.current.videoWidth > 0 ? 'text-green-400' : 'text-red-400'}>
+                  {videoRef.current?.videoWidth || 0}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-400">videoH:</span>{' '}
+                <span className={videoRef.current && videoRef.current.videoHeight > 0 ? 'text-green-400' : 'text-red-400'}>
+                  {videoRef.current?.videoHeight || 0}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-400">containerW:</span>{' '}
+                <span className={containerSize.width > 0 ? 'text-green-400' : 'text-red-400'}>
+                  {containerSize.width}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-400">containerH:</span>{' '}
+                <span className={containerSize.height > 0 ? 'text-green-400' : 'text-red-400'}>
+                  {containerSize.height}
+                </span>
+              </div>
+            </div>
+          </div>
+
           <div className="mt-2 pt-2 border-t border-gray-700 text-center">
             {debugInfo.detectionState === 'new' && (
               <span className="text-green-400">✓ Fresh detection</span>
