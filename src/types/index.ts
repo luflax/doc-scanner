@@ -107,6 +107,27 @@ export interface Histogram {
   std: { r: number; g: number; b: number; l: number };
 }
 
+export interface HistogramAnalysis {
+  histogram: Histogram;
+  // Clipping detection
+  isUnderexposed: boolean;
+  isOverexposed: boolean;
+  shadowClipping: number;  // Percentage of pixels in shadows (0-100)
+  highlightClipping: number;  // Percentage of pixels in highlights (0-100)
+  // Dynamic range
+  dynamicRange: number;  // 0-255
+  // Overall characteristics
+  averageBrightness: number;  // 0-255
+  contrast: number;  // Measure of contrast (0-100)
+  // Color cast detection
+  hasColorCast: boolean;
+  colorCastType?: 'warm' | 'cool' | 'green' | 'magenta';
+  colorCastStrength: number;  // 0-100
+  // Shadow/highlight regions
+  shadowPercentage: number;  // Percentage of image in shadows
+  highlightPercentage: number;  // Percentage of image in highlights
+}
+
 // OCR types
 export interface OCRConfig {
   language: string | string[];
