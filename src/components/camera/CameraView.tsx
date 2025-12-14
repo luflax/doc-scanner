@@ -127,7 +127,7 @@ export const CameraView: React.FC = () => {
       window.removeEventListener('resize', updateSize);
       clearTimeout(timeout);
     };
-  }, []);
+  }, [containerRef.current, isInitialized]);
 
   // Wait for video metadata to load
   useEffect(() => {
