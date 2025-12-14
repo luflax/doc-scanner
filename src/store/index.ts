@@ -67,7 +67,7 @@ interface AppState {
   setCapturing: (capturing: boolean) => void;
 
   // Scan session actions
-  startScanSession: (image: ImageData) => void;
+  startScanSession: (image: ImageData, edges?: DetectedEdge | null) => void;
   setDetectedEdges: (edges: DetectedEdge | null) => void;
   setAdjustedCorners: (corners: Point[] | null) => void;
   setProcessedImage: (image: ImageData | null) => void;
@@ -161,13 +161,13 @@ export const useStore = create<AppState>((set) => ({
     })),
 
   // Scan session actions
-  startScanSession: (image) =>
+  startScanSession: (image, edges) =>
     set({
       scanSession: {
         isActive: true,
         currentImage: image,
-        detectedEdges: null,
-        adjustedCorners: null,
+        detectedEdges: edges ?? null,
+        adjustedCorners: edges?.contour ?? null,
         processedImage: null,
         selectedFilter: 'original',
         enhancementOptions: DEFAULT_ENHANCEMENT_OPTIONS,
