@@ -50,10 +50,17 @@ export const CropView: React.FC = () => {
     }
   }, [currentImage]);
 
-  // Detect edges on mount
+  // Detect edges on mount or use passed edges from camera view
   useEffect(() => {
     if (currentImage && !detectedEdges && !isDetecting) {
       detectEdges();
+    } else if (currentImage && detectedEdges) {
+      // Edges were passed from camera view - no need to recalculate
+      console.log('[CropView] Using real-time edges from camera view');
+      addToast({
+        type: 'success',
+        message: 'Using real-time detected edges',
+      });
     }
   }, [currentImage]);
 

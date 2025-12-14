@@ -179,7 +179,8 @@ export const CameraView: React.FC = () => {
   const handleCapture = async () => {
     const imageData = await capturePhoto();
     if (imageData) {
-      startScanSession(imageData);
+      // Pass real-time detected edges to crop view to avoid recalculation
+      startScanSession(imageData, realtimeEdges);
       setCurrentView('crop');
 
       addToast({
