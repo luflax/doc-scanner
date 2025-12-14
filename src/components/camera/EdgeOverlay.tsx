@@ -23,7 +23,17 @@ export const EdgeOverlay: React.FC<EdgeOverlayProps> = ({
   containerHeight,
   showConfidence = true,
 }) => {
+  console.log('[EdgeOverlay] Rendering with:', {
+    edges: !!edges,
+    videoWidth,
+    videoHeight,
+    containerWidth,
+    containerHeight,
+    corners: edges?.contour.length,
+  });
+
   if (!edges || !videoWidth || !videoHeight) {
+    console.log('[EdgeOverlay] Early return - missing required data');
     return null;
   }
 

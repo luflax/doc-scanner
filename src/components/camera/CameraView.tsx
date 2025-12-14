@@ -17,6 +17,7 @@ export const CameraView: React.FC = () => {
   }));
 
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const [videoReady, setVideoReady] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -80,6 +81,53 @@ export const CameraView: React.FC = () => {
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
   }, []);
+
+  // Wait for video metadata to load
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handleMetadataLoaded = () => {
+      console.log('[CameraView] Video metadata loaded:', {
+        videoWidth: video.videoWidth,
+        videoHeight: video.videoHeight,
+      });
+      setVideoReady(true);
+    };
+
+    // Check if metadata is already loaded
+    if (video.readyState >= video.HAVE_METADATA) {
+      handleMetadataLoaded();
+    } else {
+      video.addEventListener('loadedmetadata', handleMetadataLoaded);
+    }
+
+    return () => {
+      video.removeEventListener('loadedmetadata', handleMetadataLoaded);
+    };
+  }, [videoRef.current, isInitialized]);
+
+  // Debug: Log overlay rendering conditions
+  useEffect(() => {
+    if (realtimeEdges) {
+      console.log('[CameraView] Overlay render check:', {
+        isEdgeDetectionReady,
+        hasEdges: !!realtimeEdges,
+        hasVideo: !!videoRef.current,
+        videoReady,
+        videoWidth: videoRef.current?.videoWidth,
+        videoHeight: videoRef.current?.videoHeight,
+        containerWidth: containerSize.width,
+        containerHeight: containerSize.height,
+      });
+    }
+  }, [
+    realtimeEdges,
+    isEdgeDetectionReady,
+    videoReady,
+    containerSize.width,
+    containerSize.height,
+  ]);
 
   const handleCapture = async () => {
     const imageData = await capturePhoto();
@@ -148,16 +196,23 @@ export const CameraView: React.FC = () => {
       />
 
       {/* Edge detection overlay */}
-      {isEdgeDetectionReady && realtimeEdges && videoRef.current && (
-        <EdgeOverlay
-          edges={realtimeEdges}
-          videoWidth={videoRef.current.videoWidth}
-          videoHeight={videoRef.current.videoHeight}
-          containerWidth={containerSize.width}
-          containerHeight={containerSize.height}
-          showConfidence={true}
-        />
-      )}
+      {isEdgeDetectionReady &&
+        realtimeEdges &&
+        videoRef.current &&
+        videoReady &&
+        videoRef.current.videoWidth > 0 &&
+        videoRef.current.videoHeight > 0 &&
+        containerSize.width > 0 &&
+        containerSize.height > 0 && (
+          <EdgeOverlay
+            edges={realtimeEdges}
+            videoWidth={videoRef.current.videoWidth}
+            videoHeight={videoRef.current.videoHeight}
+            containerWidth={containerSize.width}
+            containerHeight={containerSize.height}
+            showConfidence={true}
+          />
+        )}
 
       {/* Top controls */}
       <div className="absolute top-0 left-0 right-0 p-4">
