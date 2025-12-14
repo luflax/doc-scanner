@@ -1,17 +1,23 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useStore } from '@/store';
 import { useCameraStream } from '@/hooks/useCameraStream';
+import { useEdgeDetection } from '@/hooks/useEdgeDetection';
 import { Button } from '@/components/common/Button';
 import { IconButton } from '@/components/common/IconButton';
 import { Spinner } from '@/components/common/Spinner';
+import { EdgeOverlay } from './EdgeOverlay';
 
 export const CameraView: React.FC = () => {
-  const { addToast, setCameraCapabilities, setCurrentView, startScanSession } = useStore((state) => ({
+  const { addToast, setCameraCapabilities, setCurrentView, startScanSession, setDetectedEdges } = useStore((state) => ({
     addToast: state.addToast,
     setCameraCapabilities: state.setCameraCapabilities,
     setCurrentView: state.setCurrentView,
     startScanSession: state.startScanSession,
+    setDetectedEdges: state.setDetectedEdges,
   }));
+
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const {
     videoRef,
@@ -44,6 +50,36 @@ export const CameraView: React.FC = () => {
       setCameraCapabilities(capabilities);
     }
   }, [capabilities, setCameraCapabilities]);
+
+  // Real-time edge detection
+  const {
+    detectedEdges: realtimeEdges,
+    isReady: isEdgeDetectionReady,
+    error: edgeDetectionError,
+  } = useEdgeDetection({
+    enabled: isInitialized,
+    videoElement: videoRef.current,
+    onDetection: (edges) => {
+      // Update edges in store for real-time feedback
+      setDetectedEdges(edges);
+    },
+  });
+
+  // Measure container size for overlay positioning
+  useEffect(() => {
+    const updateSize = () => {
+      if (containerRef.current) {
+        setContainerSize({
+          width: containerRef.current.clientWidth,
+          height: containerRef.current.clientHeight,
+        });
+      }
+    };
+
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, []);
 
   const handleCapture = async () => {
     const imageData = await capturePhoto();
@@ -102,7 +138,7 @@ export const CameraView: React.FC = () => {
   }
 
   return (
-    <div className="relative w-full h-full bg-black">
+    <div ref={containerRef} className="relative w-full h-full bg-black">
       <video
         ref={videoRef}
         autoPlay
@@ -111,9 +147,34 @@ export const CameraView: React.FC = () => {
         className="w-full h-full object-cover"
       />
 
+      {/* Edge detection overlay */}
+      {isEdgeDetectionReady && realtimeEdges && videoRef.current && (
+        <EdgeOverlay
+          edges={realtimeEdges}
+          videoWidth={videoRef.current.videoWidth}
+          videoHeight={videoRef.current.videoHeight}
+          containerWidth={containerSize.width}
+          containerHeight={containerSize.height}
+          showConfidence={true}
+        />
+      )}
+
       {/* Top controls */}
       <div className="absolute top-0 left-0 right-0 p-4">
-        <div className="flex justify-end">
+        <div className="flex justify-between items-center">
+          {/* Edge detection status */}
+          <div className="bg-black/50 px-3 py-2 rounded-lg">
+            {!isEdgeDetectionReady ? (
+              <span className="text-xs text-yellow-400">Loading edge detection...</span>
+            ) : edgeDetectionError ? (
+              <span className="text-xs text-red-400">Edge detection unavailable</span>
+            ) : realtimeEdges ? (
+              <span className="text-xs text-green-400">Document detected</span>
+            ) : (
+              <span className="text-xs text-gray-400">Scanning...</span>
+            )}
+          </div>
+
           <IconButton
             icon={<span className="text-xl">🔄</span>}
             onClick={handleSwitchCamera}
