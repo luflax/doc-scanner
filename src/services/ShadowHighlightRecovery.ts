@@ -24,31 +24,45 @@ export class ShadowHighlightRecovery {
     if (amount <= 0) return;
 
     const cv = getOpenCV();
-    const lab = new cv.Mat();
-    const channels = new cv.MatVector();
-    const l = new cv.Mat();
-    const shadowMask = new cv.Mat();
-    const corrected = new cv.Mat();
-    const blended = new cv.Mat();
+
+    // Declare all Mats at the top for proper cleanup
+    let rgb: any = null;
+    let lab: any = null;
+    let channels: any = null;
+    let l: any = null;
+    let shadowMask: any = null;
+    let corrected: any = null;
+    let blended: any = null;
+    let lFloat: any = null;
+    let lFloat2: any = null;
+    let correctedFloat: any = null;
+    let invMask: any = null;
+    let originalWeighted: any = null;
+    let correctedWeighted: any = null;
+    let blendedFloat: any = null;
 
     try {
       // Convert to LAB color space (L = luminance, AB = color)
-      let rgb = new cv.Mat();
+      rgb = new cv.Mat();
       if (mat.channels() === 4) {
         cv.cvtColor(mat, rgb, cv.COLOR_RGBA2RGB);
       } else {
         mat.copyTo(rgb);
       }
 
+      lab = new cv.Mat();
       cv.cvtColor(rgb, lab, cv.COLOR_RGB2Lab);
 
       // Split channels
+      channels = new cv.MatVector();
       cv.split(lab, channels);
-      l.delete(); // Delete initial empty mat
+
+      l = new cv.Mat();
       channels.get(0).copyTo(l);
 
       // Create shadow mask (luminance < 80)
       // Soft transition from 40 (full recovery) to 120 (no recovery)
+      shadowMask = new cv.Mat();
       cv.threshold(l, shadowMask, 80, 255, cv.THRESH_BINARY_INV);
 
       // Apply Gaussian blur to mask for smooth transition
@@ -62,7 +76,7 @@ export class ShadowHighlightRecovery {
       const maxCorrection = (amount / 100) * 80; // Up to +80 luminance
 
       // Apply local histogram equalization to shadows
-      const lFloat = new cv.Mat();
+      lFloat = new cv.Mat();
       l.convertTo(lFloat, cv.CV_32F);
 
       // Calculate target luminance for shadows
@@ -82,27 +96,29 @@ export class ShadowHighlightRecovery {
         }
       }
 
+      corrected = new cv.Mat();
       lFloat.convertTo(corrected, l.type());
 
       // Blend original and corrected using shadow mask
-      const lFloat2 = new cv.Mat();
-      const correctedFloat = new cv.Mat();
+      lFloat2 = new cv.Mat();
+      correctedFloat = new cv.Mat();
       l.convertTo(lFloat2, cv.CV_32F);
       corrected.convertTo(correctedFloat, cv.CV_32F);
 
       // Weighted blend: blended = original * (1 - mask) + corrected * mask
-      const invMask = new cv.Mat();
+      invMask = new cv.Mat();
       cv.subtract(new cv.Scalar(1.0), shadowMask, invMask);
 
-      const originalWeighted = new cv.Mat();
-      const correctedWeighted = new cv.Mat();
+      originalWeighted = new cv.Mat();
+      correctedWeighted = new cv.Mat();
 
       cv.multiply(lFloat2, invMask, originalWeighted);
       cv.multiply(correctedFloat, shadowMask, correctedWeighted);
 
-      const blendedFloat = new cv.Mat();
+      blendedFloat = new cv.Mat();
       cv.add(originalWeighted, correctedWeighted, blendedFloat);
 
+      blended = new cv.Mat();
       blendedFloat.convertTo(blended, l.type());
 
       // Replace L channel with corrected version
@@ -120,23 +136,22 @@ export class ShadowHighlightRecovery {
       } else {
         rgb.copyTo(mat);
       }
-
-      // Cleanup
-      rgb.delete();
-      lFloat.delete();
-      lFloat2.delete();
-      correctedFloat.delete();
-      invMask.delete();
-      originalWeighted.delete();
-      correctedWeighted.delete();
-      blendedFloat.delete();
     } finally {
-      lab.delete();
-      channels.delete();
-      l.delete();
-      shadowMask.delete();
-      corrected.delete();
-      blended.delete();
+      // Cleanup all Mats in finally block to ensure cleanup even on error
+      if (rgb && rgb.delete) rgb.delete();
+      if (lab && lab.delete) lab.delete();
+      if (channels && channels.delete) channels.delete();
+      if (l && l.delete) l.delete();
+      if (shadowMask && shadowMask.delete) shadowMask.delete();
+      if (corrected && corrected.delete) corrected.delete();
+      if (blended && blended.delete) blended.delete();
+      if (lFloat && lFloat.delete) lFloat.delete();
+      if (lFloat2 && lFloat2.delete) lFloat2.delete();
+      if (correctedFloat && correctedFloat.delete) correctedFloat.delete();
+      if (invMask && invMask.delete) invMask.delete();
+      if (originalWeighted && originalWeighted.delete) originalWeighted.delete();
+      if (correctedWeighted && correctedWeighted.delete) correctedWeighted.delete();
+      if (blendedFloat && blendedFloat.delete) blendedFloat.delete();
     }
   }
 
@@ -153,31 +168,45 @@ export class ShadowHighlightRecovery {
     if (amount <= 0) return;
 
     const cv = getOpenCV();
-    const lab = new cv.Mat();
-    const channels = new cv.MatVector();
-    const l = new cv.Mat();
-    const highlightMask = new cv.Mat();
-    const corrected = new cv.Mat();
-    const blended = new cv.Mat();
+
+    // Declare all Mats at the top for proper cleanup
+    let rgb: any = null;
+    let lab: any = null;
+    let channels: any = null;
+    let l: any = null;
+    let highlightMask: any = null;
+    let corrected: any = null;
+    let blended: any = null;
+    let lFloat: any = null;
+    let lFloat2: any = null;
+    let correctedFloat: any = null;
+    let invMask: any = null;
+    let originalWeighted: any = null;
+    let correctedWeighted: any = null;
+    let blendedFloat: any = null;
 
     try {
       // Convert to LAB
-      let rgb = new cv.Mat();
+      rgb = new cv.Mat();
       if (mat.channels() === 4) {
         cv.cvtColor(mat, rgb, cv.COLOR_RGBA2RGB);
       } else {
         mat.copyTo(rgb);
       }
 
+      lab = new cv.Mat();
       cv.cvtColor(rgb, lab, cv.COLOR_RGB2Lab);
 
       // Split channels
+      channels = new cv.MatVector();
       cv.split(lab, channels);
-      l.delete();
+
+      l = new cv.Mat();
       channels.get(0).copyTo(l);
 
       // Create highlight mask (luminance > 200)
       // Soft transition from 200 (full recovery) to 140 (no recovery)
+      highlightMask = new cv.Mat();
       cv.threshold(l, highlightMask, 200, 255, cv.THRESH_BINARY);
 
       // Blur for smooth transition
@@ -195,7 +224,7 @@ export class ShadowHighlightRecovery {
       }
 
       // Apply lookup table
-      const lFloat = new cv.Mat();
+      lFloat = new cv.Mat();
       l.convertTo(lFloat, cv.CV_32F);
 
       const data = lFloat.data32F;
@@ -206,26 +235,28 @@ export class ShadowHighlightRecovery {
         }
       }
 
+      corrected = new cv.Mat();
       lFloat.convertTo(corrected, l.type());
 
       // Blend original and corrected using highlight mask
-      const lFloat2 = new cv.Mat();
-      const correctedFloat = new cv.Mat();
+      lFloat2 = new cv.Mat();
+      correctedFloat = new cv.Mat();
       l.convertTo(lFloat2, cv.CV_32F);
       corrected.convertTo(correctedFloat, cv.CV_32F);
 
-      const invMask = new cv.Mat();
+      invMask = new cv.Mat();
       cv.subtract(new cv.Scalar(1.0), highlightMask, invMask);
 
-      const originalWeighted = new cv.Mat();
-      const correctedWeighted = new cv.Mat();
+      originalWeighted = new cv.Mat();
+      correctedWeighted = new cv.Mat();
 
       cv.multiply(lFloat2, invMask, originalWeighted);
       cv.multiply(correctedFloat, highlightMask, correctedWeighted);
 
-      const blendedFloat = new cv.Mat();
+      blendedFloat = new cv.Mat();
       cv.add(originalWeighted, correctedWeighted, blendedFloat);
 
+      blended = new cv.Mat();
       blendedFloat.convertTo(blended, l.type());
 
       // Replace L channel
@@ -243,23 +274,22 @@ export class ShadowHighlightRecovery {
       } else {
         rgb.copyTo(mat);
       }
-
-      // Cleanup
-      rgb.delete();
-      lFloat.delete();
-      lFloat2.delete();
-      correctedFloat.delete();
-      invMask.delete();
-      originalWeighted.delete();
-      correctedWeighted.delete();
-      blendedFloat.delete();
     } finally {
-      lab.delete();
-      channels.delete();
-      l.delete();
-      highlightMask.delete();
-      corrected.delete();
-      blended.delete();
+      // Cleanup all Mats in finally block to ensure cleanup even on error
+      if (rgb && rgb.delete) rgb.delete();
+      if (lab && lab.delete) lab.delete();
+      if (channels && channels.delete) channels.delete();
+      if (l && l.delete) l.delete();
+      if (highlightMask && highlightMask.delete) highlightMask.delete();
+      if (corrected && corrected.delete) corrected.delete();
+      if (blended && blended.delete) blended.delete();
+      if (lFloat && lFloat.delete) lFloat.delete();
+      if (lFloat2 && lFloat2.delete) lFloat2.delete();
+      if (correctedFloat && correctedFloat.delete) correctedFloat.delete();
+      if (invMask && invMask.delete) invMask.delete();
+      if (originalWeighted && originalWeighted.delete) originalWeighted.delete();
+      if (correctedWeighted && correctedWeighted.delete) correctedWeighted.delete();
+      if (blendedFloat && blendedFloat.delete) blendedFloat.delete();
     }
   }
 
