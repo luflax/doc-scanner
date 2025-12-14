@@ -73,10 +73,18 @@ export const CameraView: React.FC = () => {
     if (!container) return;
 
     const updateSize = () => {
-      const width = container.clientWidth;
-      const height = container.clientHeight;
+      let width = container.clientWidth;
+      let height = container.clientHeight;
 
-      console.log('[CameraView] Container size update:', { width, height });
+      // Fallback to window dimensions if container reports 0
+      // (common issue in PWAs/mobile browsers with h-screen)
+      if (width === 0 || height === 0) {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        console.log('[CameraView] Using window dimensions as fallback:', { width, height });
+      } else {
+        console.log('[CameraView] Container size update:', { width, height });
+      }
 
       if (width > 0 && height > 0) {
         setContainerSize({ width, height });
@@ -86,8 +94,17 @@ export const CameraView: React.FC = () => {
     // Use ResizeObserver for more reliable size detection
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        const { width, height } = entry.contentRect;
-        console.log('[CameraView] ResizeObserver:', { width, height });
+        let { width, height } = entry.contentRect;
+
+        // Fallback to window dimensions if ResizeObserver reports 0
+        if (width === 0 || height === 0) {
+          width = window.innerWidth;
+          height = window.innerHeight;
+          console.log('[CameraView] ResizeObserver fallback to window:', { width, height });
+        } else {
+          console.log('[CameraView] ResizeObserver:', { width, height });
+        }
+
         if (width > 0 && height > 0) {
           setContainerSize({ width, height });
         }
@@ -96,10 +113,11 @@ export const CameraView: React.FC = () => {
 
     resizeObserver.observe(container);
 
-    // Also update on window resize as fallback
+    // Also update on window resize
     window.addEventListener('resize', updateSize);
 
-    // Initial measurement with small delay to ensure DOM is ready
+    // Initial measurement - try immediately and after delay
+    updateSize();
     const timeout = setTimeout(updateSize, 100);
 
     return () => {
@@ -289,7 +307,7 @@ export const CameraView: React.FC = () => {
 
       {/* Debug overlay - Temporal smoothing info */}
       {isEdgeDetectionReady && (
-        <div className="absolute bottom-24 left-4 right-4 bg-black/80 rounded-lg p-3 text-white text-xs font-mono max-h-96 overflow-y-auto">
+        <div className="absolute top-16 left-2 right-2 bg-black/90 rounded-lg p-2 text-white text-[10px] font-mono max-h-64 overflow-y-auto">
           <div className="font-bold mb-2 text-center text-sm">
             🔍 Edge Detection Debug
           </div>
