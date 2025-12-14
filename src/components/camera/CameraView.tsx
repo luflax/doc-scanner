@@ -69,7 +69,9 @@ export const CameraView: React.FC = () => {
 
   // Measure container size for overlay positioning
   useEffect(() => {
+    console.log('[CameraView] containerRef:', containerRef);
     const container = containerRef.current;
+    console.log('[CameraView] container:', container);
     if (!container) return;
 
     const updateSize = () => {
