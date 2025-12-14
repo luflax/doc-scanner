@@ -7,7 +7,9 @@ import path from 'path';
 export default defineConfig({
   base: '/doc-scanner/',
   plugins: [
-    react(),
+    react({
+      jsxRuntime: 'automatic',
+    }),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icons/*.png', 'icons/*.svg'],
@@ -156,58 +158,6 @@ export default defineConfig({
   build: {
     target: 'es2020',
     chunkSizeWarningLimit: 1000,
-    rollupOptions: {
-      output: {
-        manualChunks: (id) => {
-          // Vendor chunks for major libraries
-          if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom')) {
-              return 'react-vendor';
-            }
-            if (id.includes('zustand')) {
-              return 'zustand-vendor';
-            }
-            if (id.includes('tesseract.js')) {
-              return 'tesseract-vendor';
-            }
-            if (id.includes('jspdf')) {
-              return 'pdf-vendor';
-            }
-            if (id.includes('jszip')) {
-              return 'zip-vendor';
-            }
-            if (id.includes('idb')) {
-              return 'db-vendor';
-            }
-            // Other node_modules go to common vendor
-            return 'vendor';
-          }
-
-          // Split by feature modules
-          if (id.includes('/services/')) {
-            return 'services';
-          }
-          if (id.includes('/components/camera/')) {
-            return 'camera';
-          }
-          if (id.includes('/components/documents/')) {
-            return 'documents';
-          }
-          if (id.includes('/components/ocr/')) {
-            return 'ocr';
-          }
-          if (id.includes('/components/export/')) {
-            return 'export';
-          }
-          if (id.includes('/components/enhance/')) {
-            return 'enhance';
-          }
-          if (id.includes('/components/crop/')) {
-            return 'crop';
-          }
-        },
-      },
-    },
     // Source maps for production debugging (smaller than inline)
     sourcemap: 'hidden',
     // Minification options
