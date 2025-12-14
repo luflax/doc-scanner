@@ -1,3 +1,4 @@
+import React from 'react';
 import { useStore } from '@/store';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { OfflineIndicator } from '@/components/common/OfflineIndicator';
