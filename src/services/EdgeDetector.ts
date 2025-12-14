@@ -8,12 +8,12 @@ import { getOpenCV, imageDataToMat, deleteMat } from '@/lib/opencv-loader';
 import type { DetectedEdge, EdgeDetectionConfig, Point, Rectangle } from '@/types';
 
 export const DEFAULT_EDGE_DETECTION_CONFIG: EdgeDetectionConfig = {
-  cannyThreshold1: 50,
-  cannyThreshold2: 150,
+  cannyThreshold1: 30, // Lowered from 50 for better edge detection at angles
+  cannyThreshold2: 100, // Lowered from 150 for more sensitivity
   blurKernelSize: 5,
-  dilationIterations: 2,
-  minAreaRatio: 0.1, // Minimum 10% of image area
-  maxAreaRatio: 0.95, // Maximum 95% of image area
+  dilationIterations: 3, // Increased from 2 to close more gaps
+  minAreaRatio: 0.05, // Lowered from 0.1 to detect smaller/angled documents
+  maxAreaRatio: 0.98, // Increased from 0.95 for better full-frame detection
 };
 
 export class EdgeDetector {
@@ -199,20 +199,33 @@ export class EdgeDetector {
     const cv = getOpenCV();
 
     // Score by area (larger is better, up to a point)
-    const areaScore = area / imageArea;
+    const areaRatio = area / imageArea;
+    // Use a curve that rewards larger areas but doesn't penalize smaller ones too much
+    const areaScore = Math.min(1.0, areaRatio * 2);
 
-    // Score by convexity (convex shapes score higher)
+    // Score by convexity (convex shapes score higher, but non-convex is still acceptable)
     const isConvex = cv.isContourConvex(approx);
-    const convexityScore = isConvex ? 1.0 : 0.5;
+    const convexityScore = isConvex ? 1.0 : 0.7; // Relaxed from 0.5 to 0.7
 
-    // Score by aspect ratio (document-like ratios are better)
+    // Score by aspect ratio (more lenient for angled documents)
     const rect = cv.boundingRect(approx);
     const aspectRatio = Math.max(rect.width, rect.height) / Math.min(rect.width, rect.height);
-    // Prefer aspect ratios close to common document ratios (A4 = 1.41, Letter = 1.29)
-    const aspectScore = aspectRatio >= 1.2 && aspectRatio <= 2.0 ? 1.0 : 0.7;
+    // Much more lenient aspect ratio range (1.0 to 3.0) to handle angled views
+    // Documents at steep angles can appear very elongated
+    let aspectScore = 1.0;
+    if (aspectRatio < 1.0 || aspectRatio > 4.0) {
+      // Outside reasonable range
+      aspectScore = 0.5;
+    } else if (aspectRatio >= 1.2 && aspectRatio <= 2.5) {
+      // Ideal range - most common document ratios
+      aspectScore = 1.0;
+    } else {
+      // Acceptable but not ideal
+      aspectScore = 0.8;
+    }
 
-    // Combined score
-    return areaScore * convexityScore * aspectScore;
+    // Combined score - area is most important, then shape quality
+    return areaScore * 0.6 + convexityScore * 0.2 + aspectScore * 0.2;
   }
 
   /**

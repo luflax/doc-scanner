@@ -25,6 +25,13 @@ interface UseEdgeDetectionResult {
   error: Error | null;
 }
 
+// Temporal smoothing configuration
+const TEMPORAL_SMOOTHING = {
+  enabled: true,
+  keepFrames: 5, // Keep last detection for 5 failed frames (~333ms at 15fps)
+  minConfidenceToUpdate: 0.3, // Only update if new detection has at least 30% confidence
+};
+
 export function useEdgeDetection({
   enabled = true,
   videoElement,
@@ -40,6 +47,8 @@ export function useEdgeDetection({
   const frameCountRef = useRef(0);
   const rafRef = useRef<number | null>(null);
   const lastProcessTimeRef = useRef(0);
+  const lastGoodDetectionRef = useRef<DetectedEdge | null>(null);
+  const framesWithoutDetectionRef = useRef(0);
 
   // Initialize OpenCV
   useEffect(() => {
@@ -120,9 +129,10 @@ export function useEdgeDetection({
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
       // Detect edges (fast method for real-time)
-      const edges = edgeDetector.detectDocumentFast(imageData);
+      const rawEdges = edgeDetector.detectDocumentFast(imageData);
 
       // Scale corners back to original video resolution if edges detected
+      let edges = rawEdges;
       if (edges && scale !== 1.0) {
         edges.contour = edges.contour.map((point) => ({
           x: point.x / scale,
@@ -134,10 +144,47 @@ export function useEdgeDetection({
         edges.boundingRect.height /= scale;
       }
 
-      setDetectedEdges(edges);
+      // Apply temporal smoothing to reduce flickering
+      let finalEdges: DetectedEdge | null = null;
+
+      if (TEMPORAL_SMOOTHING.enabled) {
+        if (edges && edges.confidence >= TEMPORAL_SMOOTHING.minConfidenceToUpdate) {
+          // Good detection found - reset counter and update
+          framesWithoutDetectionRef.current = 0;
+          lastGoodDetectionRef.current = edges;
+          finalEdges = edges;
+          console.log(
+            `[EdgeDetection] New detection (conf: ${edges.confidence.toFixed(2)})`
+          );
+        } else {
+          // No detection or low confidence - use last good detection if available
+          framesWithoutDetectionRef.current++;
+
+          if (
+            lastGoodDetectionRef.current &&
+            framesWithoutDetectionRef.current <= TEMPORAL_SMOOTHING.keepFrames
+          ) {
+            // Keep showing last good detection
+            finalEdges = lastGoodDetectionRef.current;
+            console.log(
+              `[EdgeDetection] Using cached (${framesWithoutDetectionRef.current}/${TEMPORAL_SMOOTHING.keepFrames} frames)`
+            );
+          } else {
+            // Too many frames without detection - clear it
+            finalEdges = null;
+            lastGoodDetectionRef.current = null;
+            console.log('[EdgeDetection] Cleared - too many frames without detection');
+          }
+        }
+      } else {
+        // No smoothing - use raw detection
+        finalEdges = edges;
+      }
+
+      setDetectedEdges(finalEdges);
 
       if (onDetection) {
-        onDetection(edges);
+        onDetection(finalEdges);
       }
     } catch (err) {
       console.error('[useEdgeDetection] Frame processing error:', err);
