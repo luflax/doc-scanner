@@ -226,7 +226,8 @@ export class WhiteBalanceCorrector {
     const histSize = [256];
     const ranges = [0, 256];
 
-    const channelVec = new cv.MatVector([channel]);
+    const channelVec = new cv.MatVector();
+    channelVec.push_back(channel);
     const mask = new cv.Mat();
     cv.calcHist(channelVec, [0], mask, hist, histSize, ranges, false);
     channelVec.delete();

@@ -78,15 +78,29 @@ export class HistogramAnalyzer {
     const histG = new cv.Mat();
     const histB = new cv.Mat();
 
-    cv.calcHist(new cv.MatVector([channels.get(0)]), [0], new cv.Mat(), histR, histSize, ranges, false);
-    cv.calcHist(new cv.MatVector([channels.get(1)]), [0], new cv.Mat(), histG, histSize, ranges, false);
-    cv.calcHist(new cv.MatVector([channels.get(2)]), [0], new cv.Mat(), histB, histSize, ranges, false);
+    const vecR = new cv.MatVector(); vecR.push_back(channels.get(0));
+    const maskR = new cv.Mat();
+    cv.calcHist(vecR, [0], maskR, histR, histSize, ranges, false);
+    vecR.delete(); maskR.delete();
+
+    const vecG = new cv.MatVector(); vecG.push_back(channels.get(1));
+    const maskG = new cv.Mat();
+    cv.calcHist(vecG, [0], maskG, histG, histSize, ranges, false);
+    vecG.delete(); maskG.delete();
+
+    const vecB = new cv.MatVector(); vecB.push_back(channels.get(2));
+    const maskB = new cv.Mat();
+    cv.calcHist(vecB, [0], maskB, histB, histSize, ranges, false);
+    vecB.delete(); maskB.delete();
 
     // Calculate luminance histogram
     const gray = new cv.Mat();
     cv.cvtColor(rgb, gray, cv.COLOR_RGB2GRAY);
     const histL = new cv.Mat();
-    cv.calcHist(new cv.MatVector([gray]), [0], new cv.Mat(), histL, histSize, ranges, false);
+    const vecL = new cv.MatVector(); vecL.push_back(gray);
+    const maskL = new cv.Mat();
+    cv.calcHist(vecL, [0], maskL, histL, histSize, ranges, false);
+    vecL.delete(); maskL.delete();
 
     // Convert to arrays
     const red = Array.from(histR.data32F) as number[];

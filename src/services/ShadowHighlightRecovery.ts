@@ -350,7 +350,8 @@ export class ShadowHighlightRecovery {
       const hist = new cv.Mat();
       const histSize = [256];
       const ranges = [0, 256];
-      const lVec = new cv.MatVector([l]);
+      const lVec = new cv.MatVector();
+      lVec.push_back(l);
       const histMask = new cv.Mat();
       cv.calcHist(lVec, [0], histMask, hist, histSize, ranges, false);
       lVec.delete();
