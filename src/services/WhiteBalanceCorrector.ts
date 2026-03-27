@@ -226,15 +226,11 @@ export class WhiteBalanceCorrector {
     const histSize = [256];
     const ranges = [0, 256];
 
-    cv.calcHist(
-      new cv.MatVector([channel]),
-      [0],
-      new cv.Mat(),
-      hist,
-      histSize,
-      ranges,
-      false
-    );
+    const channelVec = new cv.MatVector([channel]);
+    const mask = new cv.Mat();
+    cv.calcHist(channelVec, [0], mask, hist, histSize, ranges, false);
+    channelVec.delete();
+    mask.delete();
 
     // Convert histogram to array
     const histData = Array.from(hist.data32F) as number[];
@@ -312,7 +308,11 @@ export class WhiteBalanceCorrector {
         this.whitePatchBalance(mat, 95);
 
         // Blend results (70% gray world, 30% white patch)
-        cv.addWeighted(grayWorld, 0.7, mat, 0.3, 0, mat);
+        // Use a separate output Mat to avoid aliased src2/dst
+        const blended = new cv.Mat();
+        cv.addWeighted(grayWorld, 0.7, mat, 0.3, 0, blended);
+        blended.copyTo(mat);
+        blended.delete();
 
         original.delete();
         grayWorld.delete();

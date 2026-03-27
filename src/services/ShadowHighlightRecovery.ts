@@ -37,6 +37,7 @@ export class ShadowHighlightRecovery {
     let lFloat2: any = null;
     let correctedFloat: any = null;
     let invMask: any = null;
+    let ones: any = null;
     let originalWeighted: any = null;
     let correctedWeighted: any = null;
     let blendedFloat: any = null;
@@ -106,8 +107,10 @@ export class ShadowHighlightRecovery {
       corrected.convertTo(correctedFloat, cv.CV_32F);
 
       // Weighted blend: blended = original * (1 - mask) + corrected * mask
+      // cv.subtract requires Mat as first arg; create a Mat of ones to compute (1 - mask)
       invMask = new cv.Mat();
-      cv.subtract(new cv.Scalar(1.0), shadowMask, invMask);
+      ones = cv.Mat.ones(shadowMask.rows, shadowMask.cols, cv.CV_32F);
+      cv.subtract(ones, shadowMask, invMask);
 
       originalWeighted = new cv.Mat();
       correctedWeighted = new cv.Mat();
@@ -149,6 +152,7 @@ export class ShadowHighlightRecovery {
       if (lFloat2 && lFloat2.delete) lFloat2.delete();
       if (correctedFloat && correctedFloat.delete) correctedFloat.delete();
       if (invMask && invMask.delete) invMask.delete();
+      if (ones && ones.delete) ones.delete();
       if (originalWeighted && originalWeighted.delete) originalWeighted.delete();
       if (correctedWeighted && correctedWeighted.delete) correctedWeighted.delete();
       if (blendedFloat && blendedFloat.delete) blendedFloat.delete();
@@ -181,6 +185,7 @@ export class ShadowHighlightRecovery {
     let lFloat2: any = null;
     let correctedFloat: any = null;
     let invMask: any = null;
+    let ones: any = null;
     let originalWeighted: any = null;
     let correctedWeighted: any = null;
     let blendedFloat: any = null;
@@ -245,7 +250,8 @@ export class ShadowHighlightRecovery {
       corrected.convertTo(correctedFloat, cv.CV_32F);
 
       invMask = new cv.Mat();
-      cv.subtract(new cv.Scalar(1.0), highlightMask, invMask);
+      ones = cv.Mat.ones(highlightMask.rows, highlightMask.cols, cv.CV_32F);
+      cv.subtract(ones, highlightMask, invMask);
 
       originalWeighted = new cv.Mat();
       correctedWeighted = new cv.Mat();
@@ -287,6 +293,7 @@ export class ShadowHighlightRecovery {
       if (lFloat2 && lFloat2.delete) lFloat2.delete();
       if (correctedFloat && correctedFloat.delete) correctedFloat.delete();
       if (invMask && invMask.delete) invMask.delete();
+      if (ones && ones.delete) ones.delete();
       if (originalWeighted && originalWeighted.delete) originalWeighted.delete();
       if (correctedWeighted && correctedWeighted.delete) correctedWeighted.delete();
       if (blendedFloat && blendedFloat.delete) blendedFloat.delete();
@@ -343,7 +350,11 @@ export class ShadowHighlightRecovery {
       const hist = new cv.Mat();
       const histSize = [256];
       const ranges = [0, 256];
-      cv.calcHist(new cv.MatVector([l]), [0], new cv.Mat(), hist, histSize, ranges, false);
+      const lVec = new cv.MatVector([l]);
+      const histMask = new cv.Mat();
+      cv.calcHist(lVec, [0], histMask, hist, histSize, ranges, false);
+      lVec.delete();
+      histMask.delete();
 
       const histData = Array.from(hist.data32F) as number[];
       const totalPixels = histData.reduce((sum, count) => sum + count, 0);

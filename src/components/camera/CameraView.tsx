@@ -18,6 +18,7 @@ export const CameraView: React.FC = () => {
 
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [videoReady, setVideoReady] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -278,12 +279,20 @@ export const CameraView: React.FC = () => {
             )}
           </div>
 
-          <IconButton
-            icon={<span className="text-xl">🔄</span>}
-            onClick={handleSwitchCamera}
-            className="bg-black/50 text-white hover:bg-black/70"
-            label="Switch camera"
-          />
+          <div className="flex gap-2">
+            <IconButton
+              icon={<span className="text-xl">🔍</span>}
+              onClick={() => setShowDebug((v) => !v)}
+              className={showDebug ? 'bg-yellow-500/80 text-white hover:bg-yellow-500' : 'bg-black/50 text-white hover:bg-black/70'}
+              label="Toggle debug overlay"
+            />
+            <IconButton
+              icon={<span className="text-xl">🔄</span>}
+              onClick={handleSwitchCamera}
+              className="bg-black/50 text-white hover:bg-black/70"
+              label="Switch camera"
+            />
+          </div>
         </div>
       </div>
 
@@ -309,7 +318,7 @@ export const CameraView: React.FC = () => {
       </div>
 
       {/* Debug overlay - Temporal smoothing info */}
-      {isEdgeDetectionReady && (
+      {showDebug && isEdgeDetectionReady && (
         <div className="absolute top-16 left-2 right-2 bg-black/90 rounded-lg p-2 text-white text-[10px] font-mono max-h-64 overflow-y-auto">
           <div className="font-bold mb-2 text-center text-sm">
             🔍 Edge Detection Debug

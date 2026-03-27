@@ -39,7 +39,7 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <div className="flex flex-col h-screen overflow-hidden bg-white">
+      <div className="flex flex-col h-[100dvh] overflow-hidden bg-white">
         <Header />
         <main className="flex-1 overflow-hidden mt-14 mb-16">
           {renderView()}
