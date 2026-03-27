@@ -306,9 +306,13 @@ export class ImageEnhancementService {
       shadowHighlightRecovery.recover(src, 30, 20);
 
       // Apply bilateral filter for noise reduction
+      // bilateralFilter requires 1 or 3 channels — convert RGBA→RGB→RGBA
+      const rgb = new this.cv.Mat();
       const denoised = new this.cv.Mat();
-      this.cv.bilateralFilter(src, denoised, 5, 40, 40);
-      denoised.copyTo(src);
+      this.cv.cvtColor(src, rgb, this.cv.COLOR_RGBA2RGB);
+      this.cv.bilateralFilter(rgb, denoised, 5, 40, 40);
+      rgb.delete();
+      this.cv.cvtColor(denoised, src, this.cv.COLOR_RGB2RGBA);
       denoised.delete();
 
       // Apply CLAHE to enhance local contrast
@@ -500,9 +504,13 @@ export class ImageEnhancementService {
       shadowHighlightRecovery.recover(result, 15, 10);
 
       // Bilateral filter for noise reduction
+      // bilateralFilter requires 1 or 3 channels — convert RGBA→RGB→RGBA
+      const rgb = new this.cv.Mat();
       const denoised = new this.cv.Mat();
-      this.cv.bilateralFilter(result, denoised, 5, 30, 30);
-      denoised.copyTo(result);
+      this.cv.cvtColor(result, rgb, this.cv.COLOR_RGBA2RGB);
+      this.cv.bilateralFilter(rgb, denoised, 5, 30, 30);
+      rgb.delete();
+      this.cv.cvtColor(denoised, result, this.cv.COLOR_RGB2RGBA);
       denoised.delete();
 
       // Slight enhancement
