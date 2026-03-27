@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Document paper -->
+  <rect x="20" y="10" width="55" height="70" rx="4" fill="#ffffff" stroke="#94a3b8" stroke-width="3"/>
+  <!-- Folded corner -->
+  <polygon points="55,10 75,10 75,28" fill="#cbd5e1"/>
+  <polyline points="55,10 55,28 75,28" fill="none" stroke="#94a3b8" stroke-width="3"/>
+  <!-- Text lines on document -->
+  <line x1="30" y1="40" x2="60" y2="40" stroke="#cbd5e1" stroke-width="3" stroke-linecap="round"/>
+  <line x1="30" y1="50" x2="65" y2="50" stroke="#cbd5e1" stroke-width="3" stroke-linecap="round"/>
+  <line x1="30" y1="60" x2="55" y2="60" stroke="#cbd5e1" stroke-width="3" stroke-linecap="round"/>
+  <!-- Scanner beam -->
+  <line x1="15" y1="55" x2="80" y2="55" stroke="#3b82f6" stroke-width="3.5" stroke-linecap="round" opacity="0.9"/>
+  <!-- Glow effect above beam -->
+  <rect x="15" y="44" width="65" height="11" fill="#3b82f6" opacity="0.12" rx="1"/>
+</svg>
