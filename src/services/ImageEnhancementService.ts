@@ -288,51 +288,115 @@ export class ImageEnhancementService {
   }
 
   /**
-   * Magic filter - Auto-enhanced color with shadow/highlight recovery
+   * Magic filter - Document background normalization (CamScanner Enhanced style)
+   *
+   * Core technique: estimate the local background illumination via a large Gaussian
+   * blur, then divide every pixel by its background estimate. Background pixels
+   * (paper) normalize to ~255 (pure white); text pixels become proportionally dark.
+   * A tone curve clamps the result and a mild LAB desaturation removes the paper
+   * colour cast.
    */
   private applyMagicFilter(imageData: ImageData): ImageData | null {
     let src: any = null;
-    let lab: any = null;
-    let channels: any = null;
-    let result: any = null;
+    let srcRgb: any = null;
+    let bgEstimate: any = null;
+    let src32f: any = null;
+    let bg32f: any = null;
+    let normalized32f: any = null;
+    let result8u: any = null;
+    let labMat: any = null;
+    let labChannels: any = null;
+    let resultRGBA: any = null;
 
     try {
+      // A. Load image and strip alpha channel
       src = imageDataToMat(imageData);
+      srcRgb = new this.cv.Mat();
+      this.cv.cvtColor(src, srcRgb, this.cv.COLOR_RGBA2RGB);
 
-      // Apply auto white balance
-      whiteBalanceCorrector.smartBalance(src);
+      // B. Estimate background illumination with a large Gaussian blur.
+      //    Sigma is ~4% of the largest image dimension so the kernel spans
+      //    the whole page and blurs away text while capturing slow lighting
+      //    gradients (shadows, page curl, uneven illumination).
+      const sigma = Math.max(srcRgb.rows, srcRgb.cols) * 0.04;
+      bgEstimate = new this.cv.Mat();
+      this.cv.GaussianBlur(
+        srcRgb, bgEstimate,
+        new this.cv.Size(0, 0), sigma, sigma,
+        this.cv.BORDER_REFLECT_101,
+      );
 
-      // Apply shadow and highlight recovery
-      shadowHighlightRecovery.recover(src, 30, 20);
+      // C. Convert both source and background to float for accurate division.
+      //    Apply an epsilon floor to the background to prevent divide-by-zero.
+      src32f = new this.cv.Mat();
+      srcRgb.convertTo(src32f, this.cv.CV_32F);
 
-      // Apply bilateral filter for noise reduction
-      // bilateralFilter requires 1 or 3 channels — convert RGBA→RGB→RGBA
-      const rgb = new this.cv.Mat();
-      const denoised = new this.cv.Mat();
-      this.cv.cvtColor(src, rgb, this.cv.COLOR_RGBA2RGB);
-      this.cv.bilateralFilter(rgb, denoised, 5, 40, 40);
-      rgb.delete();
-      this.cv.cvtColor(denoised, src, this.cv.COLOR_RGB2RGBA);
-      denoised.delete();
+      bg32f = new this.cv.Mat();
+      bgEstimate.convertTo(bg32f, this.cv.CV_32F);
 
-      // Apply CLAHE to enhance local contrast
-      this.applyCLAHE(src);
+      const epsMat = new this.cv.Mat(bg32f.rows, bg32f.cols, bg32f.type());
+      epsMat.setTo(new this.cv.Scalar(1.0, 1.0, 1.0));
+      this.cv.max(bg32f, epsMat, bg32f);
+      epsMat.delete();
 
-      // Slight saturation boost
-      this.applySaturation(src, 15);
+      // D. Illumination normalization: pixel / background * 255.
+      //    Background pixels → ~255 (white); text pixels → proportionally dark.
+      //    Values above 255 (specular highlights) are clipped in step E.
+      normalized32f = new this.cv.Mat();
+      this.cv.divide(src32f, bg32f, normalized32f, 255.0);
 
-      // Apply sharpening
-      unsharpMask.sharpen(src, 0.4, 1.5, 0);
+      // E. Tone curve: push near-whites firmly to 255, keep darks dark.
+      //    Derivation: background normalises to ~220 after division, so
+      //    1.15 * 220 + 2 ≈ 255. convertTo clips overflow to 255 for CV_8U.
+      result8u = new this.cv.Mat();
+      normalized32f.convertTo(result8u, this.cv.CV_8U, 1.15, 2);
 
-      src.copyTo(result = new this.cv.Mat());
+      // F. Colour cast removal in LAB space.
+      //    Blend A and B channels 75 % original / 25 % neutral (128) to reduce
+      //    the warm/teal paper tint without desaturating ink colours visibly.
+      labMat = new this.cv.Mat();
+      this.cv.cvtColor(result8u, labMat, this.cv.COLOR_RGB2Lab);
 
-      return matToImageData(result);
+      labChannels = new this.cv.MatVector();
+      this.cv.split(labMat, labChannels);
+
+      const neutral128 = new this.cv.Mat(
+        labChannels.get(1).rows, labChannels.get(1).cols,
+        labChannels.get(1).type(),
+      );
+      neutral128.setTo(new this.cv.Scalar(128));
+
+      const aResult = new this.cv.Mat();
+      const bResult = new this.cv.Mat();
+      this.cv.addWeighted(labChannels.get(1), 0.75, neutral128, 0.25, 0, aResult);
+      this.cv.addWeighted(labChannels.get(2), 0.75, neutral128, 0.25, 0, bResult);
+      aResult.copyTo(labChannels.get(1));
+      bResult.copyTo(labChannels.get(2));
+      aResult.delete();
+      bResult.delete();
+      neutral128.delete();
+
+      this.cv.merge(labChannels, labMat);
+      this.cv.cvtColor(labMat, result8u, this.cv.COLOR_Lab2RGB);
+
+      // G. Convert back to RGBA
+      resultRGBA = new this.cv.Mat();
+      this.cv.cvtColor(result8u, resultRGBA, this.cv.COLOR_RGB2RGBA);
+
+      // H. Mild sharpening to crisp up text edges.
+      //    Lighter parameters than before — normalization already creates
+      //    strong edge contrast so heavy sharpening would cause haloing.
+      unsharpMask.sharpen(resultRGBA, 0.3, 1.2, 0);
+
+      return matToImageData(resultRGBA);
     } catch (error) {
       console.error('Magic filter failed:', error);
       return null;
     } finally {
-      deleteMat(src, lab, result);
-      if (channels) channels.delete();
+      deleteMat(src, srcRgb, bgEstimate, src32f, bg32f, normalized32f, result8u, labMat, resultRGBA);
+      if (labChannels) {
+        try { labChannels.delete(); } catch (_) {}
+      }
     }
   }
 
