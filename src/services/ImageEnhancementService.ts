@@ -301,9 +301,13 @@ export class ImageEnhancementService {
     let srcRgb: any = null;
     let small: any = null;
     let bgSmall: any = null;
-    let bgGraySmall: any = null;
-    let bgGray: any = null;
-    let bgGray3: any = null;
+    let bgMaxSmall: any = null;
+    let bgMaxSmallR: any = null;
+    let bgMaxSmallG: any = null;
+    let bgMaxSmallB: any = null;
+    let bgMaxSmallVec: any = null;
+    let bgMax: any = null;
+    let bgMax3: any = null;
     let src32f: any = null;
     let bg32f: any = null;
     let normalized32f: any = null;
@@ -343,45 +347,58 @@ export class ImageEnhancementService {
       const bgMean = this.cv.mean(bgSmall);
       console.log(`[Magic] BgEstimate mean RGB=(${bgMean[0].toFixed(1)},${bgMean[1].toFixed(1)},${bgMean[2].toFixed(1)})  blur time=${(tB - t0).toFixed(0)}ms`);
 
-      // Convert background to grayscale luminance, then upsample.
-      //    Using luminance (not per-channel RGB) as the divisor preserves the
-      //    hue/saturation of coloured regions (e.g. red headers stay red).
-      //    Per-channel: red_bg_R≈200, so R/bg_R≈1→255 and G/bg_G≈1→255 (white).
-      //    Luminance: bg_lum≈88, so R=200/88×255→255, G=40/88×255=116 → still red.
-      bgGraySmall = new this.cv.Mat();
-      this.cv.cvtColor(bgSmall, bgGraySmall, this.cv.COLOR_RGB2GRAY);
+      // Compute per-pixel max(R,G,B) of the background estimate, then upsample.
+      //    Using max-channel (not luminance) as the divisor preserves saturation:
+      //    in neutral/paper areas max≈R≈G≈B (acts like luminance, paper→white);
+      //    in red areas max=R_bg≈200, so G=40/200×255=51 (correctly suppressed),
+      //    while luminance bg_lum≈91 would give G=40/91×255=112 (washed out).
+      //    The dominant channel sets the "white point" for each region, keeping
+      //    colour ratios intact and giving vivid, CamScanner-like output.
+      bgMaxSmallVec = new this.cv.MatVector();
+      this.cv.split(bgSmall, bgMaxSmallVec);
+      bgMaxSmallR = new this.cv.Mat();
+      bgMaxSmallG = new this.cv.Mat();
+      bgMaxSmallB = new this.cv.Mat();
+      bgMaxSmallVec.get(0).copyTo(bgMaxSmallR);
+      bgMaxSmallVec.get(1).copyTo(bgMaxSmallG);
+      bgMaxSmallVec.get(2).copyTo(bgMaxSmallB);
 
-      bgGray = new this.cv.Mat();
-      this.cv.resize(bgGraySmall, bgGray, new this.cv.Size(srcRgb.cols, srcRgb.rows), 0, 0, this.cv.INTER_LINEAR);
+      bgMaxSmall = new this.cv.Mat();
+      this.cv.max(bgMaxSmallR, bgMaxSmallG, bgMaxSmall);
+      this.cv.max(bgMaxSmall, bgMaxSmallB, bgMaxSmall);
 
-      bgGray3 = new this.cv.Mat();
-      this.cv.cvtColor(bgGray, bgGray3, this.cv.COLOR_GRAY2RGB);
+      bgMax = new this.cv.Mat();
+      this.cv.resize(bgMaxSmall, bgMax, new this.cv.Size(srcRgb.cols, srcRgb.rows), 0, 0, this.cv.INTER_LINEAR);
 
-      // C. Convert source and luminance background to float; apply epsilon floor.
+      bgMax3 = new this.cv.Mat();
+      this.cv.cvtColor(bgMax, bgMax3, this.cv.COLOR_GRAY2RGB);
+
+      // C. Convert source and max-channel background to float; apply epsilon floor.
       src32f = new this.cv.Mat();
       srcRgb.convertTo(src32f, this.cv.CV_32F);
 
       bg32f = new this.cv.Mat();
-      bgGray3.convertTo(bg32f, this.cv.CV_32F);
+      bgMax3.convertTo(bg32f, this.cv.CV_32F);
 
       const epsMat = new this.cv.Mat(bg32f.rows, bg32f.cols, bg32f.type());
       epsMat.setTo(new this.cv.Scalar(1.0, 1.0, 1.0));
       this.cv.max(bg32f, epsMat, bg32f);
       epsMat.delete();
 
-      // D. Colour-preserving illumination normalization: pixel / bg_luminance × 255.
-      //    Paper → white; ink → dark; coloured areas keep their hue.
+      // D. Colour-preserving illumination normalization: pixel / bg_max × 255.
+      //    Paper → white; ink → dark; coloured areas keep their saturation.
       normalized32f = new this.cv.Mat();
       this.cv.divide(src32f, bg32f, normalized32f, 255.0);
 
       const normMean = this.cv.mean(normalized32f);
       console.log(`[Magic] Normalized32f mean RGB=(${normMean[0].toFixed(1)},${normMean[1].toFixed(1)},${normMean[2].toFixed(1)})  ← background landing point`);
 
-      // E. Tone curve: push near-whites firmly to 255, keep darks dark.
-      //    Derivation: background normalises to ~220 after division, so
-      //    1.15 * 220 + 2 ≈ 255. convertTo clips overflow to 255 for CV_8U.
+      // E. Tone curve: push near-whites firmly to 255, darken mid-tones/text.
+      //    With bg_max normalization paper G/B lands ~230, text ~73.
+      //    α=1.4, β=-65 solves: f(230)=255 (paper→white) and f(73)=37 (text→dark).
+      //    Values below ~46 clip to 0 (pure black for very dark ink).
       result8u = new this.cv.Mat();
-      normalized32f.convertTo(result8u, this.cv.CV_8U, 1.15, 2);
+      normalized32f.convertTo(result8u, this.cv.CV_8U, 1.4, -65);
 
       const curveMean = this.cv.mean(result8u);
       const totalPx = result8u.rows * result8u.cols;
@@ -445,7 +462,8 @@ export class ImageEnhancementService {
       console.error('Magic filter failed:', error);
       return null;
     } finally {
-      deleteMat(src, srcRgb, small, bgSmall, bgGraySmall, bgGray, bgGray3, src32f, bg32f, normalized32f, result8u, labMat, resultRGBA);
+      deleteMat(src, srcRgb, small, bgSmall, bgMaxSmall, bgMaxSmallR, bgMaxSmallG, bgMaxSmallB, bgMax, bgMax3, src32f, bg32f, normalized32f, result8u, labMat, resultRGBA);
+      if (bgMaxSmallVec) { try { bgMaxSmallVec.delete(); } catch (_) {} }
       if (labChannels) {
         try { labChannels.delete(); } catch (_) {}
       }
