@@ -299,7 +299,11 @@ export class ImageEnhancementService {
   private applyMagicFilter(imageData: ImageData): ImageData | null {
     let src: any = null;
     let srcRgb: any = null;
-    let bgEstimate: any = null;
+    let small: any = null;
+    let bgSmall: any = null;
+    let bgGraySmall: any = null;
+    let bgGray: any = null;
+    let bgGray3: any = null;
     let src32f: any = null;
     let bg32f: any = null;
     let normalized32f: any = null;
@@ -320,37 +324,53 @@ export class ImageEnhancementService {
       const inputMean = this.cv.mean(srcRgb);
       console.log(`[Magic] Input: ${srcRgb.rows}x${srcRgb.cols}  sigma=${sigma.toFixed(2)}  mean RGB=(${inputMean[0].toFixed(1)},${inputMean[1].toFixed(1)},${inputMean[2].toFixed(1)})`);
 
-      // B. Estimate background illumination with a large Gaussian blur.
-      //    Sigma is ~4% of the largest image dimension so the kernel spans
-      //    the whole page and blurs away text while capturing slow lighting
-      //    gradients (shadows, page curl, uneven illumination).
-      bgEstimate = new this.cv.Mat();
-      this.cv.GaussianBlur(
-        srcRgb, bgEstimate,
-        new this.cv.Size(0, 0), sigma, sigma,
-        this.cv.BORDER_REFLECT_101,
-      );
+      // B. Estimate background illumination via downsample → blur → upsample.
+      //    Blurring a 1/8th-size version gives the same effective coverage as
+      //    blurring the full image with the original sigma, but runs ~64× faster
+      //    because GaussianBlur cost scales with image area × kernel area.
+      const downscale = 8;
+      const smallW = Math.max(4, Math.round(srcRgb.cols / downscale));
+      const smallH = Math.max(4, Math.round(srcRgb.rows / downscale));
+      const sigmaSmall = Math.max(1.5, sigma / downscale);
+
+      small = new this.cv.Mat();
+      this.cv.resize(srcRgb, small, new this.cv.Size(smallW, smallH), 0, 0, this.cv.INTER_AREA);
+
+      bgSmall = new this.cv.Mat();
+      this.cv.GaussianBlur(small, bgSmall, new this.cv.Size(0, 0), sigmaSmall, sigmaSmall, this.cv.BORDER_REFLECT_101);
 
       const tB = performance.now();
-      const bgMean = this.cv.mean(bgEstimate);
+      const bgMean = this.cv.mean(bgSmall);
       console.log(`[Magic] BgEstimate mean RGB=(${bgMean[0].toFixed(1)},${bgMean[1].toFixed(1)},${bgMean[2].toFixed(1)})  blur time=${(tB - t0).toFixed(0)}ms`);
 
-      // C. Convert both source and background to float for accurate division.
-      //    Apply an epsilon floor to the background to prevent divide-by-zero.
+      // Convert background to grayscale luminance, then upsample.
+      //    Using luminance (not per-channel RGB) as the divisor preserves the
+      //    hue/saturation of coloured regions (e.g. red headers stay red).
+      //    Per-channel: red_bg_R≈200, so R/bg_R≈1→255 and G/bg_G≈1→255 (white).
+      //    Luminance: bg_lum≈88, so R=200/88×255→255, G=40/88×255=116 → still red.
+      bgGraySmall = new this.cv.Mat();
+      this.cv.cvtColor(bgSmall, bgGraySmall, this.cv.COLOR_RGB2GRAY);
+
+      bgGray = new this.cv.Mat();
+      this.cv.resize(bgGraySmall, bgGray, new this.cv.Size(srcRgb.cols, srcRgb.rows), 0, 0, this.cv.INTER_LINEAR);
+
+      bgGray3 = new this.cv.Mat();
+      this.cv.cvtColor(bgGray, bgGray3, this.cv.COLOR_GRAY2RGB);
+
+      // C. Convert source and luminance background to float; apply epsilon floor.
       src32f = new this.cv.Mat();
       srcRgb.convertTo(src32f, this.cv.CV_32F);
 
       bg32f = new this.cv.Mat();
-      bgEstimate.convertTo(bg32f, this.cv.CV_32F);
+      bgGray3.convertTo(bg32f, this.cv.CV_32F);
 
       const epsMat = new this.cv.Mat(bg32f.rows, bg32f.cols, bg32f.type());
       epsMat.setTo(new this.cv.Scalar(1.0, 1.0, 1.0));
       this.cv.max(bg32f, epsMat, bg32f);
       epsMat.delete();
 
-      // D. Illumination normalization: pixel / background * 255.
-      //    Background pixels → ~255 (white); text pixels → proportionally dark.
-      //    Values above 255 (specular highlights) are clipped in step E.
+      // D. Colour-preserving illumination normalization: pixel / bg_luminance × 255.
+      //    Paper → white; ink → dark; coloured areas keep their hue.
       normalized32f = new this.cv.Mat();
       this.cv.divide(src32f, bg32f, normalized32f, 255.0);
 
@@ -425,7 +445,7 @@ export class ImageEnhancementService {
       console.error('Magic filter failed:', error);
       return null;
     } finally {
-      deleteMat(src, srcRgb, bgEstimate, src32f, bg32f, normalized32f, result8u, labMat, resultRGBA);
+      deleteMat(src, srcRgb, small, bgSmall, bgGraySmall, bgGray, bgGray3, src32f, bg32f, normalized32f, result8u, labMat, resultRGBA);
       if (labChannels) {
         try { labChannels.delete(); } catch (_) {}
       }
