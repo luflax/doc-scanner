@@ -22,6 +22,7 @@ export const EnhanceView: React.FC = () => {
     adjustedCorners,
     selectedFilter,
     enhancementOptions,
+    imageSource,
     setCurrentView,
     setSelectedFilter,
     setEnhancementOptions,
@@ -34,6 +35,7 @@ export const EnhanceView: React.FC = () => {
     adjustedCorners: state.scanSession.adjustedCorners,
     selectedFilter: state.scanSession.selectedFilter,
     enhancementOptions: state.scanSession.enhancementOptions,
+    imageSource: state.scanSession.imageSource,
     setCurrentView: state.setCurrentView,
     setSelectedFilter: state.setSelectedFilter,
     setEnhancementOptions: state.setEnhancementOptions,
@@ -252,7 +254,7 @@ export const EnhanceView: React.FC = () => {
           totalPages: 1,
           hasOCR: false,
           fileSize: processedBlob.size,
-          source: 'camera',
+          source: imageSource,
         },
       };
 

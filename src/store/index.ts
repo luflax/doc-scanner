@@ -28,6 +28,7 @@ interface ScanSessionState {
   processedImage: ImageData | null;
   selectedFilter: FilterPreset;
   enhancementOptions: EnhancementOptions;
+  imageSource: 'camera' | 'upload';
 }
 
 interface OCRState {
@@ -67,7 +68,7 @@ interface AppState {
   setCapturing: (capturing: boolean) => void;
 
   // Scan session actions
-  startScanSession: (image: ImageData, edges?: DetectedEdge | null) => void;
+  startScanSession: (image: ImageData, edges?: DetectedEdge | null, source?: 'camera' | 'upload') => void;
   setDetectedEdges: (edges: DetectedEdge | null) => void;
   setAdjustedCorners: (corners: Point[] | null) => void;
   setProcessedImage: (image: ImageData | null) => void;
@@ -117,6 +118,7 @@ export const useStore = create<AppState>((set) => ({
     processedImage: null,
     selectedFilter: 'original',
     enhancementOptions: DEFAULT_ENHANCEMENT_OPTIONS,
+    imageSource: 'camera',
   },
   ocr: {
     isInitialized: false,
@@ -161,7 +163,7 @@ export const useStore = create<AppState>((set) => ({
     })),
 
   // Scan session actions
-  startScanSession: (image, edges) =>
+  startScanSession: (image, edges, source = 'camera') =>
     set({
       scanSession: {
         isActive: true,
@@ -171,6 +173,7 @@ export const useStore = create<AppState>((set) => ({
         processedImage: null,
         selectedFilter: 'original',
         enhancementOptions: DEFAULT_ENHANCEMENT_OPTIONS,
+        imageSource: source,
       },
     }),
   setDetectedEdges: (edges) =>
@@ -203,6 +206,7 @@ export const useStore = create<AppState>((set) => ({
         processedImage: null,
         selectedFilter: 'original',
         enhancementOptions: DEFAULT_ENHANCEMENT_OPTIONS,
+        imageSource: 'camera',
       },
     }),
 

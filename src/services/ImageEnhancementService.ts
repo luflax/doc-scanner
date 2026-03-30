@@ -309,22 +309,31 @@ export class ImageEnhancementService {
     let resultRGBA: any = null;
 
     try {
+      const t0 = performance.now();
+
       // A. Load image and strip alpha channel
       src = imageDataToMat(imageData);
       srcRgb = new this.cv.Mat();
       this.cv.cvtColor(src, srcRgb, this.cv.COLOR_RGBA2RGB);
 
+      const sigma = Math.max(srcRgb.rows, srcRgb.cols) * 0.04;
+      const inputMean = this.cv.mean(srcRgb);
+      console.log(`[Magic] Input: ${srcRgb.rows}x${srcRgb.cols}  sigma=${sigma.toFixed(2)}  mean RGB=(${inputMean[0].toFixed(1)},${inputMean[1].toFixed(1)},${inputMean[2].toFixed(1)})`);
+
       // B. Estimate background illumination with a large Gaussian blur.
       //    Sigma is ~4% of the largest image dimension so the kernel spans
       //    the whole page and blurs away text while capturing slow lighting
       //    gradients (shadows, page curl, uneven illumination).
-      const sigma = Math.max(srcRgb.rows, srcRgb.cols) * 0.04;
       bgEstimate = new this.cv.Mat();
       this.cv.GaussianBlur(
         srcRgb, bgEstimate,
         new this.cv.Size(0, 0), sigma, sigma,
         this.cv.BORDER_REFLECT_101,
       );
+
+      const tB = performance.now();
+      const bgMean = this.cv.mean(bgEstimate);
+      console.log(`[Magic] BgEstimate mean RGB=(${bgMean[0].toFixed(1)},${bgMean[1].toFixed(1)},${bgMean[2].toFixed(1)})  blur time=${(tB - t0).toFixed(0)}ms`);
 
       // C. Convert both source and background to float for accurate division.
       //    Apply an epsilon floor to the background to prevent divide-by-zero.
@@ -345,11 +354,27 @@ export class ImageEnhancementService {
       normalized32f = new this.cv.Mat();
       this.cv.divide(src32f, bg32f, normalized32f, 255.0);
 
+      const normMean = this.cv.mean(normalized32f);
+      console.log(`[Magic] Normalized32f mean RGB=(${normMean[0].toFixed(1)},${normMean[1].toFixed(1)},${normMean[2].toFixed(1)})  ← background landing point`);
+
       // E. Tone curve: push near-whites firmly to 255, keep darks dark.
       //    Derivation: background normalises to ~220 after division, so
       //    1.15 * 220 + 2 ≈ 255. convertTo clips overflow to 255 for CV_8U.
       result8u = new this.cv.Mat();
       normalized32f.convertTo(result8u, this.cv.CV_8U, 1.15, 2);
+
+      const curveMean = this.cv.mean(result8u);
+      const totalPx = result8u.rows * result8u.cols;
+      const dataE = result8u.data as Uint8Array;
+      const nch = result8u.channels();
+      let count220 = 0;
+      let count240 = 0;
+      for (let i = 0; i < dataE.length; i += nch) {
+        const avg = (dataE[i] + dataE[i + 1] + dataE[i + 2]) / 3;
+        if (avg > 220) count220++;
+        if (avg > 240) count240++;
+      }
+      console.log(`[Magic] After tone curve: mean=${curveMean[0].toFixed(1)}  white>220=${((count220 / totalPx) * 100).toFixed(1)}%  white>240=${((count240 / totalPx) * 100).toFixed(1)}%`);
 
       // F. Colour cast removal in LAB space.
       //    Blend A and B channels 75 % original / 25 % neutral (128) to reduce
@@ -370,6 +395,11 @@ export class ImageEnhancementService {
       const bResult = new this.cv.Mat();
       this.cv.addWeighted(labChannels.get(1), 0.75, neutral128, 0.25, 0, aResult);
       this.cv.addWeighted(labChannels.get(2), 0.75, neutral128, 0.25, 0, bResult);
+
+      const aMean = this.cv.mean(aResult);
+      const bMean = this.cv.mean(bResult);
+      console.log(`[Magic] After desaturation: A-mean=${aMean[0].toFixed(1)}  B-mean=${bMean[0].toFixed(1)}  (128=neutral)`);
+
       aResult.copyTo(labChannels.get(1));
       bResult.copyTo(labChannels.get(2));
       aResult.delete();
@@ -387,6 +417,8 @@ export class ImageEnhancementService {
       //    Lighter parameters than before — normalization already creates
       //    strong edge contrast so heavy sharpening would cause haloing.
       unsharpMask.sharpen(resultRGBA, 0.3, 1.2, 0);
+
+      console.log(`[Magic] Total time: ${(performance.now() - t0).toFixed(0)}ms`);
 
       return matToImageData(resultRGBA);
     } catch (error) {

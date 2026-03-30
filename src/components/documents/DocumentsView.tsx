@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useStore } from '@/store';
 import { getStorageService } from '@/services/StorageService';
 import { getBulkExportService } from '@/services/BulkExportService';
@@ -19,6 +19,7 @@ export const DocumentsView: React.FC = () => {
     clearDocumentSelection,
     selectAllDocuments,
     setCurrentView,
+    startScanSession,
     addToast,
   } = useStore((state) => ({
     documents: state.documents.list,
@@ -30,9 +31,11 @@ export const DocumentsView: React.FC = () => {
     clearDocumentSelection: state.clearDocumentSelection,
     selectAllDocuments: state.selectAllDocuments,
     setCurrentView: state.setCurrentView,
+    startScanSession: state.startScanSession,
     addToast: state.addToast,
   }));
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [thumbnails, setThumbnails] = useState<Map<string, string>>(new Map());
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -115,6 +118,38 @@ export const DocumentsView: React.FC = () => {
     return () => {
       thumbnails.forEach((url) => URL.revokeObjectURL(url));
     };
+  };
+
+  const handleImportImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!e.target) return;
+    e.target.value = '';
+    if (!file) return;
+
+    try {
+      const objectUrl = URL.createObjectURL(file);
+      const img = new Image();
+      const imageData = await new Promise<ImageData>((resolve, reject) => {
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) { reject(new Error('Failed to get canvas context')); return; }
+          ctx.drawImage(img, 0, 0);
+          resolve(ctx.getImageData(0, 0, canvas.width, canvas.height));
+        };
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = objectUrl;
+      });
+      URL.revokeObjectURL(objectUrl);
+
+      startScanSession(imageData, null, 'upload');
+      setCurrentView('crop');
+    } catch (error) {
+      console.error('Failed to import image:', error);
+      addToast({ type: 'error', message: 'Failed to import image' });
+    }
   };
 
   const handleDocumentClick = (document: Document) => {
@@ -263,20 +298,40 @@ export const DocumentsView: React.FC = () => {
   if (documents.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full bg-gray-50 p-6">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleImportImage}
+        />
         <div className="text-6xl mb-4">📁</div>
         <h2 className="text-xl font-semibold mb-2">No Documents Yet</h2>
         <p className="text-sm text-gray-600 mb-6 text-center max-w-md">
           Start by scanning your first document using the camera.
         </p>
-        <Button onClick={() => setCurrentView('camera')} variant="primary" size="lg">
-          Scan Document
-        </Button>
+        <div className="flex gap-3">
+          <Button onClick={() => setCurrentView('camera')} variant="primary" size="lg">
+            Scan Document
+          </Button>
+          <Button onClick={() => fileInputRef.current?.click()} variant="secondary" size="lg">
+            Import Image
+          </Button>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="h-full bg-gray-50 flex flex-col">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleImportImage}
+      />
+
       {/* Header */}
       <div className="bg-white border-b border-gray-200 p-4">
         <div className="flex items-center justify-between">
@@ -290,13 +345,22 @@ export const DocumentsView: React.FC = () => {
               {isSelectionMode ? 'Cancel' : 'Select'}
             </Button>
             {!isSelectionMode && (
-              <Button
-                onClick={() => setCurrentView('camera')}
-                variant="primary"
-                size="sm"
-              >
-                + New Scan
-              </Button>
+              <>
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  variant="secondary"
+                  size="sm"
+                >
+                  Import
+                </Button>
+                <Button
+                  onClick={() => setCurrentView('camera')}
+                  variant="primary"
+                  size="sm"
+                >
+                  + New Scan
+                </Button>
+              </>
             )}
           </div>
         </div>
